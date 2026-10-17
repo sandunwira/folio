@@ -1,4 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# folio
+
+folio is a quiet, web-first media archive for browsing photos and videos. It is inspired by self-hosted media managers such as Immich, with a focused gallery experience, responsive navigation, and installable PWA support.
+
+The current version is a polished frontend prototype. It uses curated remote image assets to demonstrate the experience; uploads, accounts, storage, and media persistence are not connected to a backend yet.
+
+## Features
+
+- Responsive media archive for desktop and mobile
+- Library, albums, favorites, and archive navigation
+- Search by media title and location
+- Featured memory section and recent media gallery
+- Color-preserved photo and video previews
+- Video labels and collection markers
+- Full-screen media preview
+- Upload flow UI for photos and videos
+- Installable PWA manifest and service worker shell
+- Tailwind CSS utility styling
+
+## Getting started
+
+### Requirements
+
+- Node.js 20 or newer
+- npm
+
+Install dependencies and start the development server:
+
+```bash
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in a browser.
+
+## Scripts
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the local development server |
+| `npm run lint` | Run ESLint |
+| `npm run build` | Create a production build |
+| `npm run start` | Serve the production build |
+
+## PWA support
+
+PWA assets live in `public/`:
+
+- `manifest.webmanifest` defines the folio app identity and standalone display mode.
+- `icon.svg` provides the install icon.
+- `sw.js` caches the app shell and same-origin requests for repeat visits.
+
+The service worker is registered from the client page. Service workers require a secure origin in production; `localhost` is supported during local development.
+
+## Project structure
+
+```text
+src/app/
+ page.js       # folio archive interface and client interactions
+ layout.js     # document metadata and root layout
+ globals.css   # Tailwind import
+public/
+ manifest.webmanifest
+ icon.svg
+ sw.js
+```
+
+## Current scope
+
+folio currently focuses on the visual and interaction layer. A future backend can connect the existing search, navigation, preview, and upload surfaces to real media records, authentication, storage, metadata, and background synchronization.
+
+## Validation
+
+Before shipping changes, run:
+
+```bash
+npm run lint
+npm run build
+```
 
 ## Getting Started
 

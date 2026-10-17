@@ -1,0 +1,17 @@
+{
+	"name": "folio - Personal archive",
+	"short_name": "folio",
+	"description": "A quiet home for all your photos and videos.",
+	"start_url": "/",
+	"display": "standalone",
+	"background_color": "#f8f9f7",
+	"theme_color": "#202020",
+	"icons": [
+		{
+			"src": "/icon.svg",
+			"sizes": "any",
+			"type": "image/svg+xml",
+			"purpose": "any maskable"
+		}
+	]
+}
