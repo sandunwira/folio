@@ -4,8 +4,8 @@
 	"description": "A quiet home for all your photos and videos.",
 	"start_url": "/",
 	"display": "standalone",
-	"background_color": "#f8f9f7",
-	"theme_color": "#202020",
+	"background_color": "#ffffff",
+	"theme_color": "#fafafa",
 	"icons": [
 		{
 			"src": "/icon.svg",
