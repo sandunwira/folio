@@ -12,11 +12,6 @@
 	--color-ok: #188038;
 	--color-warning: #b45309;
 	--color-danger: #d93025;
-	--font-sans: "Google Sans Text", Roboto, "Segoe UI", system-ui, -apple-system, sans-serif;
-}
-
-html {
-	font-family: var(--font-sans);
 }
 
 button {
