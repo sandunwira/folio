@@ -4,7 +4,7 @@ import path from "node:path";
 
 const db = new Database(path.join(process.cwd(), "folio.db"));
 db.pragma("journal_mode = WAL");
-		db.exec(`
+db.exec(`
 		CREATE TABLE IF NOT EXISTS users (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			username TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -32,13 +32,12 @@ db.pragma("journal_mode = WAL");
 	`);
 
 
-	const DEFAULT_SETTINGS = {
-		app_name: "folio",
-		maintenance: "off",
-		session_days: "30",
-		quota_gb: "15",
-		used_gb: "5.7",
-	};
+const DEFAULT_SETTINGS = {
+	maintenance: "off",
+	session_days: "30",
+	quota_gb: "15",
+	used_gb: "5.7",
+};
 
 export const SESSION_COOKIE = "folio_session";
 export const SESSION_DAYS = 30;

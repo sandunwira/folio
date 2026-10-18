@@ -47,7 +47,7 @@ Open [http://localhost:3000](http://localhost:3000) in a browser.
 PWA assets live in `public/`:
 
 - `manifest.webmanifest` defines the folio app identity and standalone display mode.
-- `icon.svg` provides the install icon.
+- `icon.png` provides the install icon.
 - `sw.js` caches the app shell and same-origin requests for repeat visits.
 
 The service worker is registered from the client page. Service workers require a secure origin in production; `localhost` is supported during local development.
@@ -61,7 +61,7 @@ src/app/
  globals.css   # Tailwind import
 public/
  manifest.webmanifest
- icon.svg
+ icon.png
  sw.js
 ```
 

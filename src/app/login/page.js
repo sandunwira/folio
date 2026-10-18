@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { countUsers, getSessionUser } from "@/lib/auth";
 import { loginAction, setupAdminAction } from "@/lib/actions";
 
-export const metadata = { title: "Sign in | folio" };
+export const metadata = { title: "Sign in | Folio" };
 
 function Logo() {
 	return (
@@ -28,7 +28,7 @@ async function Content({ params }) {
 			<div className="w-full max-w-sm">
 				<div className="flex flex-col items-center">
 					<Logo />
-					<p className="mt-3 text-xl font-medium text-ink">folio</p>
+					<p className="mt-3 text-xl font-medium text-ink">Folio</p>
 					<p className="text-sm text-muted">Your personal archive</p>
 				</div>
 				<div className="mt-8 rounded-3xl border border-line bg-panel p-7">
@@ -60,7 +60,7 @@ async function Content({ params }) {
 					) : (
 						<>
 							<h1 className="text-lg font-medium text-ink">Sign in</h1>
-							<p className="mt-1 text-xs text-muted">Use your local folio account.</p>
+							<p className="mt-1 text-xs text-muted">Use your local Folio account.</p>
 							<form action={loginAction} className="mt-5 flex flex-col gap-3">
 								<label className="flex flex-col gap-1.5">
 									<span className="text-xs font-medium text-ink">Username</span>

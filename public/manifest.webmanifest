@@ -1,6 +1,6 @@
 {
-	"name": "folio - Personal archive",
-	"short_name": "folio",
+	"name": "Folio - Personal archive",
+	"short_name": "Folio",
 	"description": "A quiet home for all your photos and videos.",
 	"start_url": "/",
 	"display": "standalone",
@@ -8,10 +8,10 @@
 	"theme_color": "#fafafa",
 	"icons": [
 		{
-			"src": "/icon.svg",
+			"src": "/icon.png",
 			"sizes": "any",
-			"type": "image/svg+xml",
-			"purpose": "any maskable"
+			"type": "image/png",
+			"purpose": "maskable any"
 		}
 	]
 }

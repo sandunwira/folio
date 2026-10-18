@@ -88,21 +88,18 @@ export async function deleteUserAction(formData) {
 export async function updateAdminSettingsAction(formData) {
 	const session = await getSessionUser();
 	if (!session?.isAdmin) redirect("/");
-	const appName = String(formData.get("appName") ?? "").trim();
 	const maintenance = formData.get("maintenance") === "on";
 	const sessionDays = Number(formData.get("sessionDays"));
 	const quotaGb = Number(formData.get("quotaGb"));
 	const usedGb = Number(formData.get("usedGb"));
 
 	const failPath = (message) => `/settings?error=${encodeURIComponent(message)}`;
-	if (!appName) redirect(failPath("App name can't be empty."));
-	if (appName.length > 40) redirect(failPath("App name must be 40 characters or fewer."));
 	if (!Number.isInteger(sessionDays) || sessionDays < 1 || sessionDays > 365) redirect(failPath("Session lifetime must be between 1 and 365 days."));
 	if (!Number.isFinite(quotaGb) || quotaGb < 1) redirect(failPath("Storage quota must be at least 1 GB."));
 	if (!Number.isFinite(usedGb) || usedGb < 0) redirect(failPath("Storage used can't be negative."));
 	if (usedGb > quotaGb) redirect(failPath("Storage used can't exceed the quota."));
 
-	setSettings({ app_name: appName, maintenance: maintenance ? "on" : "off", session_days: String(sessionDays), quota_gb: String(quotaGb), used_gb: String(usedGb) });
+	setSettings({ maintenance: maintenance ? "on" : "off", session_days: String(sessionDays), quota_gb: String(quotaGb), used_gb: String(usedGb) });
 	logEvent("settings_updated", session.username, maintenance ? "Site settings updated (maintenance on)" : "Site settings updated");
 	redirect("/settings?saved=1");
 }

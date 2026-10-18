@@ -58,7 +58,7 @@ async function Content({ params }) {
 						const isFailure = event.type === "login_failed";
 						return (
 							<li key={event.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-6 py-3.5">
-								<span className={`rounded-full px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${isFailure ? "bg-[#fbeaea] text-[#c5221f]" : "bg-[#f1f1f1] text-[#6b6b6b]"}`}>
+								<span className={`rounded-full px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${isFailure ? "bg-[#fbeaea] text-[#c5221f]" : "bg-[#f1f1f1] text-muted"}`}>
 									{eventLabels[event.type] ?? event.type}
 								</span>
 								<span className="text-sm font-medium">{event.actor || "unknown"}</span>

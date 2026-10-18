@@ -5,7 +5,7 @@ import Link from "next/link";
 import { getSessionUser, getSettings } from "@/lib/auth";
 import { logoutAction, updateAdminSettingsAction } from "@/lib/actions";
 
-export const metadata = { title: "Settings | folio" };
+export const metadata = { title: "Settings | Folio" };
 
 async function Content({ params }) {
 	const user = await getSessionUser();
@@ -31,7 +31,7 @@ async function Content({ params }) {
 						<p className="flex items-center gap-2 truncate text-lg font-medium">
 							{user.name}
 							{user.isAdmin && (
-								<span className="flex items-center gap-1 rounded-full bg-[#f1f1f1] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#6b6b6b]">
+								<span className="flex items-center gap-1 rounded-full bg-[#f1f1f1] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
 									<IconShieldLock size={10} /> Admin
 								</span>
 							)}
@@ -72,10 +72,6 @@ async function Content({ params }) {
 							<p className="mt-1 text-xs text-muted">These settings control the whole archive for every account.</p>
 						</div>
 						<form action={updateAdminSettingsAction} className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2">
-							<label className="flex flex-col gap-1.5 sm:col-span-2">
-								<span className="text-xs font-medium text-ink">App name</span>
-								<input name="appName" required maxLength={40} defaultValue={settings.app_name} className="h-10 rounded-full border border-line bg-surface px-4 text-sm text-ink outline-none focus:border-ink" />
-							</label>
 							<label className="flex flex-col gap-1.5">
 								<span className="text-xs font-medium text-ink">Session lifetime (days)</span>
 								<input name="sessionDays" type="number" min={1} max={365} required defaultValue={settings.session_days} className="h-10 rounded-full border border-line bg-surface px-4 text-sm text-ink outline-none focus:border-ink" />

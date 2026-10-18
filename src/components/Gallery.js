@@ -83,7 +83,7 @@ const emptyStates = {
 	Trash: { icon: IconTrash, title: "No items in Trash", text: "Deleted photos and videos are kept here for 60 days before being removed forever." },
 };
 
-function PinwheelLogo({ size = 24 }) {
+function Logo({ size = 24 }) {
 	return (
 		<img src="/icon.png" alt="Logo" width={size} height={size} className="text-[#1F5194]" />
 	);
@@ -149,15 +149,15 @@ function UserMenu({ user, className = "" }) {
 	);
 }
 
-function SidebarContent({ user, brand, storage, activeNav, query, setQuery, onNavigate }) {
+function SidebarContent({ storage, activeNav, query, setQuery, onNavigate }) {
 	return (
 		<>
-			<button className="flex items-center gap-4 rounded-full px-4 py-2.5 text-[17px] font-medium text-ink hover:bg-black/5 md:px-6" onClick={() => onNavigate("Media")}>
+			<Link href="/" className="flex items-center gap-3 px-4 py-2 md:px-6 rounded-full font-medium text-ink hover:bg-black/5">
 				<span className="md:hidden"><Icon icon={IconMenu2} /></span>
-				<PinwheelLogo />
-				<span className="truncate text-sm font-semibold tracking-tight text-ink">{brand}</span>
-			</button>
-			<label className="mx-2 my-1 mt-3 flex h-12 items-center gap-3 rounded-full bg-[#f0f0f0] px-4 text-muted transition hover:bg-[#ebebeb] focus-within:bg-white focus-within:shadow-md">
+				<Logo />
+				<span className="truncate text-sm font-semibold tracking-tight text-ink">Folio</span>
+			</Link>
+			<label className="mx-2 my-1 mt-5 flex h-12 items-center gap-3 rounded-full bg-[#f0f0f0] px-4 text-muted transition hover:bg-[#ebebeb] focus-within:bg-white focus-within:shadow-md">
 				<Icon icon={IconSearch} className="shrink-0" />
 				<input className="w-full border-0 bg-transparent text-sm text-ink outline-none placeholder:text-muted" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your photos" />
 			</label>
@@ -175,25 +175,12 @@ function SidebarContent({ user, brand, storage, activeNav, query, setQuery, onNa
 					<div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#ececec]"><div className="h-full rounded-full bg-ink" style={{ width: `${storage.percent}%` }} /></div>
 					<p className="mt-2 text-[11px] text-muted">{storage.usedGb} GB of {storage.quotaGb} GB used</p>
 				</div>
-				<div className="mt-2 flex items-center gap-3 px-2 pb-2 pt-3 md:px-4">
-					<span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-ink text-xs font-medium text-white">{(user.name?.[0] ?? "?").toUpperCase()}</span>
-					<div className="min-w-0 flex-1">
-						<p className="truncate text-sm font-medium text-ink">{user.name}</p>
-						<p className="truncate text-xs text-muted">@{user.username}</p>
-					</div>
-					<form action={logoutAction}>
-						<button className="grid h-8 w-8 place-items-center rounded-full text-muted transition hover:bg-black/5 hover:text-ink" aria-label="Log out">
-							<Icon icon={IconPower} size={16} />
-						</button>
-					</form>
-				</div>
 			</div>
 		</>
 	);
 }
 
 export default function Gallery({ user, settings = {} }) {
-	const brandName = settings.appName ?? "folio";
 	const quotaGb = settings.quotaGb ?? 15;
 	const usedGb = settings.usedGb ?? 5.7;
 	const storagePercent = quotaGb > 0 ? Math.min(100, (usedGb / quotaGb) * 100) : 0;
@@ -259,7 +246,7 @@ export default function Gallery({ user, settings = {} }) {
 	return (
 		<div className="min-h-screen bg-surface text-ink">
 			<aside className={`fixed inset-y-0 left-0 z-50 flex w-75 max-w-[85vw] flex-col bg-panel px-3 py-4 shadow-2xl transition-transform duration-300 md:z-30 md:w-64 md:translate-x-0 md:shadow-none ${drawerOpen ? "translate-x-0" : "-translate-x-full"}`}>
-				<SidebarContent user={user} brand={brandName} storage={{ usedGb, quotaGb, percent: storagePercent }} activeNav={activeNav} setActiveNav={setActiveNav} query={query} setQuery={setQuery} onNavigate={navigate} />
+				<SidebarContent user={user} storage={{ usedGb, quotaGb, percent: storagePercent }} activeNav={activeNav} setActiveNav={setActiveNav} query={query} setQuery={setQuery} onNavigate={navigate} />
 			</aside>
 			{drawerOpen && <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setDrawerOpen(false)} />}
 
@@ -291,7 +278,7 @@ export default function Gallery({ user, settings = {} }) {
 					<div className="mb-4 flex flex-wrap items-center justify-between gap-3">
 						<h1 className="hidden text-[22px] font-medium md:block">{pageTitle}</h1>
 						<p className="text-xs text-muted md:hidden">{filteredPhotos.length} items</p>
-						<UserMenu user={user} className="shrink-0" />
+						<UserMenu user={user} className="shrink-0 hidden md:block" />
 					</div>
 
 					{activeNav === "Places" ? (

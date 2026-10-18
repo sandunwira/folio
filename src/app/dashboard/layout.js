@@ -6,7 +6,7 @@ import { getSessionUser } from "@/lib/auth";
 import { logoutAction } from "@/lib/actions";
 import AdminNav from "./AdminNav";
 
-export const metadata = { title: "Admin | folio" };
+export const metadata = { title: "Admin | Folio" };
 
 async function AdminSidebarContent() {
 	const user = await getSessionUser();
@@ -15,13 +15,13 @@ async function AdminSidebarContent() {
 	return (
 		<>
 			<div className="flex items-center gap-3 px-4 py-2 md:px-6">
-				<img src="/icon.png" alt="Logo" width={24} height={24} />
-				<span className="truncate text-sm font-semibold tracking-tight text-ink">Admin</span>
-				<Link href="/" className="ml-auto grid h-8 w-8 place-items-center rounded-full text-muted transition hover:bg-black/5 hover:text-ink" aria-label="Back to archive">
+				<Link href="/" className="grid h-8 w-8 place-items-center rounded-full text-muted transition hover:bg-black/5 hover:text-ink" aria-label="Back to archive">
 					<IconChevronLeft size={16} />
 				</Link>
+				<img src="/icon.png" alt="Logo" width={24} height={24} />
+				<span className="truncate text-sm font-semibold tracking-tight text-ink">Admin</span>
 			</div>
-			<div className="mt-5 flex-1 overflow-y-auto pb-4 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-black/15 [&::-webkit-scrollbar-track]:bg-transparent">
+			<div className="mt-5 flex-1 overflow-y-auto pb-4 scrollbar-thin [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-black/15 [&::-webkit-scrollbar-track]:bg-transparent">
 				<AdminNav />
 			</div>
 			<div className="border-t border-line px-2 pb-2 pt-3 md:px-4">
