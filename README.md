@@ -1,6 +1,6 @@
-# folio
+# Folio
 
-folio is a quiet, web-first media archive for browsing photos and videos. It is inspired by self-hosted media managers such as Immich, with a focused gallery experience, responsive navigation, and installable PWA support.
+Folio is a quiet, web-first media archive for browsing photos and videos. It is inspired by self-hosted media managers such as Immich, with a focused gallery experience, responsive navigation, and installable PWA support.
 
 The current version is a polished frontend prototype. It uses curated remote image assets to demonstrate the experience; uploads, accounts, storage, and media persistence are not connected to a backend yet.
 
@@ -46,7 +46,7 @@ Open [http://localhost:3000](http://localhost:3000) in a browser.
 
 PWA assets live in `public/`:
 
-- `manifest.webmanifest` defines the folio app identity and standalone display mode.
+- `manifest.webmanifest` defines the Folio app identity and standalone display mode.
 - `icon.png` provides the install icon.
 - `sw.js` caches the app shell and same-origin requests for repeat visits.
 
@@ -56,7 +56,7 @@ The service worker is registered from the client page. Service workers require a
 
 ```text
 src/app/
- page.js       # folio archive interface and client interactions
+ page.js       # Folio archive interface and client interactions
  layout.js     # document metadata and root layout
  globals.css   # Tailwind import
 public/
@@ -67,7 +67,7 @@ public/
 
 ## Current scope
 
-folio currently focuses on the visual and interaction layer. A future backend can connect the existing search, navigation, preview, and upload surfaces to real media records, authentication, storage, metadata, and background synchronization.
+Folio currently focuses on the visual and interaction layer. A future backend can connect the existing search, navigation, preview, and upload surfaces to real media records, authentication, storage, metadata, and background synchronization.
 
 ## Validation
 
