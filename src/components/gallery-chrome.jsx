@@ -4,14 +4,19 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
+	IconAlertCircle,
+	IconAlertTriangle,
 	IconAlbum,
 	IconArchive,
+	IconCheck,
+	IconCircleCheckFilled,
 	IconCloudUpload,
 	IconHeart,
 	IconLock,
 	IconMap,
 	IconMenu2,
 	IconPhoto,
+	IconRefresh,
 	IconSearch,
 	IconTrash,
 	IconUsers,
@@ -65,15 +70,180 @@ function SearchField() {
 	);
 }
 
+function UploadModal({ onClose, onSubmit }) {
+	const [picked, setPicked] = useState([]);
+
+	const onPick = (event) => {
+		const list = [...event.target.files];
+		if (list.length > 0) {
+			setPicked((current) => {
+				const seen = new Set(current.map((file) => `${file.name}:${file.size}`));
+				return [...current, ...list.filter((file) => !seen.has(`${file.name}:${file.size}`))];
+			});
+		}
+		event.target.value = "";
+	};
+
+	const removeFile = (index) => setPicked((current) => current.filter((_, i) => i !== index));
+
+	return (
+		<div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-5" onClick={onClose}>
+			<div className="relative w-full max-w-md rounded-3xl bg-panel p-8 text-center shadow-2xl" onClick={(event) => event.stopPropagation()}>
+				<button type="button" className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full text-muted hover:bg-black/5" onClick={onClose} aria-label="Close upload dialog">
+					<Icon icon={IconX} />
+				</button>
+				<div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-black/5 text-ink">
+					<Icon icon={IconCloudUpload} size={26} />
+				</div>
+				<h2 className="mt-5 text-xl font-medium">Upload to your archive</h2>
+				<p className="mx-auto mt-2 max-w-xs text-sm text-muted">Add photos and videos from your device. They will be backed up automatically.</p>
+				<label className="mt-6 flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-full border border-dashed border-line text-sm font-medium text-ink transition hover:bg-black/5">
+					<Icon icon={IconCloudUpload} size={18} /> Select from computer
+					<input type="file" multiple accept="image/*,video/*" className="hidden" onChange={onPick} />
+				</label>
+				{picked.length > 0 && (
+					<div className="mt-4 max-h-40 space-y-1 overflow-y-auto rounded-xl border border-line p-2 text-left">
+						{picked.map((file, index) => (
+							<div key={`${file.name}:${file.size}:${index}`} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition hover:bg-black/5">
+								<span className="min-w-0 flex-1 truncate text-ink">{file.name}</span>
+								<span className="shrink-0 text-muted">{formatBytes(file.size)}</span>
+								<button type="button" onClick={() => removeFile(index)} aria-label={`Remove ${file.name}`} className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-muted hover:bg-black/10 hover:text-ink">
+									<Icon icon={IconX} size={12} />
+								</button>
+							</div>
+						))}
+					</div>
+				)}
+				<button type="button" disabled={picked.length === 0} onClick={() => onSubmit(picked)} className="mt-4 h-11 w-full rounded-full bg-ink text-sm font-medium text-white transition hover:bg-black disabled:opacity-60">
+					Upload {picked.length > 0 ? `${picked.length} item${picked.length === 1 ? "" : "s"}` : ""}
+				</button>
+				<p className="mt-4 text-[11px] text-faint">JPG, PNG, HEIC, MOV, MP4</p>
+			</div>
+		</div>
+	);
+}
+
+function formatBytes(bytes) {
+	if (!bytes || bytes <= 0) return "0 B";
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
+	if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+	return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+}
+
+function uploadOne(file, onProgress) {
+	return new Promise((resolve, reject) => {
+		const form = new FormData();
+		form.append("files", file);
+		const xhr = new XMLHttpRequest();
+		xhr.open("POST", "/api/upload");
+		xhr.upload.onprogress = (event) => {
+			if (event.lengthComputable) onProgress(event.loaded / event.total);
+		};
+		xhr.onload = () => {
+			let data = {};
+			try {
+				data = JSON.parse(xhr.responseText);
+			} catch {
+				data = {};
+			}
+			if (xhr.status === 200) resolve(data);
+			else reject(new Error(data.error ?? "Upload failed"));
+		};
+		xhr.onerror = () => reject(new Error("Network error"));
+		xhr.send(form);
+	});
+}
+
+function UploadTray({ task, onClose, onRetry }) {
+	const failed = task.items.filter((item) => item.status === "failed").length;
+	const skipped = task.items.filter((item) => item.status === "skipped").length;
+	const finishedCount = task.items.filter((item) => item.status !== "waiting" && item.status !== "uploading").length;
+	const percent = Math.round((finishedCount / task.items.length) * 100);
+	const headline = task.finished ? `Upload finished · ${task.items.length - failed - skipped} done${skipped ? ` · ${skipped} skipped` : ""}${failed ? ` · ${failed} failed` : ""}` : `Uploading ${finishedCount}/${task.items.length} · ${percent}%`;
+	const statusIcons = {
+		done: { icon: IconCircleCheckFilled, className: "text-green-600" },
+		failed: { icon: IconAlertTriangle, className: "text-danger" },
+		skipped: { icon: IconAlertCircle, className: "text-warning" },
+	};
+
+	return (
+		<div className="fixed bottom-24 right-5 z-40 w-80 max-w-[calc(100vw-2.5rem)] rounded-2xl border border-line bg-panel p-4 shadow-xl">
+			<div className="flex items-center justify-between">
+				<p className="text-md font-medium text-ink">{headline}</p>
+				<button type="button" onClick={onClose} aria-label="Dismiss" className="grid h-7 w-7 place-items-center rounded-full text-muted hover:bg-black/5">
+					<Icon icon={IconX} size={14} />
+				</button>
+			</div>
+			<ul className="mt-3 max-h-56 overflow-y-auto">
+				{task.items.map((item) => {
+					const icon = statusIcons[item.status];
+					return (
+						<li key={`${item.name}:${item.id}`} className="flex flex-row items-center gap-3 text-sm py-1.5">
+							<span className={`block ${icon ? icon.className : ""}`}>
+								{icon && <Icon icon={icon.icon} size={20} />}
+							</span>
+							<span className="min-w-0 flex-1 truncate text-ink">{item.name}</span>
+							{item.status === "failed" && (
+								<button type="button" onClick={() => onRetry(item.id)} aria-label={`Retry ${item.name}`} className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-ink transition hover:bg-black/10">
+									<Icon icon={IconRefresh} size={20} />
+								</button>
+							)}
+							{item.status === "uploading" && <span className="shrink-0 text-muted">{Math.round((item.progress ?? 0) * 100)}%</span>}
+							{item.status === "waiting" && <span className="shrink-0 text-muted">Queued</span>}
+							{item.status === "skipped" && <span className="shrink-0 text-danger">Skipped</span>}
+						</li>
+					);
+				})}
+			</ul>
+		</div>
+	);
+}
+
 export default function GalleryChrome({ brand, storage }) {
 	const pathname = usePathname();
+	const router = useRouter();
 	const [drawerOpen, setDrawerOpen] = useState(false);
 	const [showUpload, setShowUpload] = useState(false);
+	const [uploadTask, setUploadTask] = useState(null);
 	const activeTitle = routeTitles[pathname] ?? "Media";
 
 	useEffect(() => {
 		if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
 	}, []);
+
+	const startUploadTask = async (files) => {
+		setShowUpload(false);
+		setUploadTask({
+			items: files.map((file, index) => ({ id: index, file, name: file.name, size: file.size, status: "waiting", progress: 0 })),
+			finished: false,
+		});
+		const patchItem = (index, fields) => setUploadTask((task) => task ? { ...task, items: task.items.map((item, i) => (i === index ? { ...item, ...fields } : item)) } : task);
+		for (let index = 0; index < files.length; index += 1) {
+			await runUploadAt(index, files[index], patchItem);
+		}
+		setUploadTask((task) => task ? { ...task, finished: true } : task);
+		router.refresh();
+	};
+
+	const runUploadAt = async (index, file, patchItemArg) => {
+		const patchItem = patchItemArg ?? ((i, fields) => setUploadTask((task) => task ? { ...task, items: task.items.map((item, j) => (j === i ? { ...item, ...fields } : item)) } : task));
+		if (!file) return;
+		patchItem(index, { status: "uploading", progress: 0 });
+		try {
+			const data = await uploadOne(file, (fraction) => patchItem(index, { progress: fraction }));
+			patchItem(index, { status: data.skipped > 0 ? "skipped" : "done", progress: 1 });
+		} catch {
+			patchItem(index, { status: "failed" });
+		}
+	};
+
+	const retryUpload = async (index) => {
+		const item = uploadTask?.items[index];
+		if (!item) return;
+		await runUploadAt(index, item.file);
+		router.refresh();
+	};
 
 	return (
 		<>
@@ -122,24 +292,8 @@ export default function GalleryChrome({ brand, storage }) {
 				<Icon icon={IconCloudUpload} size={24} />
 			</button>
 
-			{showUpload && (
-				<div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-5" onClick={() => setShowUpload(false)}>
-					<div className="relative w-full max-w-md rounded-3xl bg-panel p-8 text-center shadow-2xl" onClick={(event) => event.stopPropagation()}>
-						<button className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full text-muted hover:bg-black/5" onClick={() => setShowUpload(false)} aria-label="Close upload dialog">
-							<Icon icon={IconX} />
-						</button>
-						<div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-black/5 text-ink">
-							<Icon icon={IconCloudUpload} size={26} />
-						</div>
-						<h2 className="mt-5 text-xl font-medium">Upload to your archive</h2>
-						<p className="mx-auto mt-2 max-w-xs text-sm text-muted">Add photos and videos from your device. They will be backed up automatically.</p>
-						<button className="mt-7 flex h-11 w-full items-center justify-center gap-2 rounded-full bg-ink text-sm font-medium text-white transition hover:bg-black" onClick={() => setShowUpload(false)}>
-							<Icon icon={IconCloudUpload} size={18} /> Select from computer
-						</button>
-						<p className="mt-4 text-[11px] text-faint">JPG, PNG, HEIC, MOV, MP4</p>
-					</div>
-				</div>
-			)}
+			{showUpload && <UploadModal onClose={() => setShowUpload(false)} onSubmit={startUploadTask} />}
+			{uploadTask && <UploadTray task={uploadTask} onClose={() => setUploadTask(null)} onRetry={retryUpload} />}
 		</>
 	);
 }

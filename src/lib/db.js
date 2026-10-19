@@ -29,8 +29,33 @@ db.exec(`
 			detail TEXT NOT NULL,
 			created_at INTEGER NOT NULL
 		);
+		CREATE TABLE IF NOT EXISTS media (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			title TEXT NOT NULL,
+			filename TEXT NOT NULL,
+			mime TEXT NOT NULL,
+			size INTEGER NOT NULL,
+			location TEXT NOT NULL DEFAULT '',
+			created_at INTEGER NOT NULL
+		);
+		CREATE INDEX IF NOT EXISTS media_user_created ON media(user_id, created_at DESC);
 	`);
 
+
+	for (const statement of [
+		"ALTER TABLE media ADD COLUMN url TEXT",
+		"ALTER TABLE media ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0",
+		"ALTER TABLE media ADD COLUMN archived INTEGER NOT NULL DEFAULT 0",
+		"ALTER TABLE media ADD COLUMN vaulted INTEGER NOT NULL DEFAULT 0",
+		"ALTER TABLE media ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
+	]) {
+		try {
+			db.exec(statement);
+		} catch (error) {
+			if (!String(error).includes("duplicate column")) throw error;
+		}
+	}
 
 const DEFAULT_SETTINGS = {
 	maintenance: "off",
@@ -135,4 +160,47 @@ export function listEvents(limit = 100, type) {
 		return db.prepare("SELECT id, type, actor, detail, created_at FROM events WHERE type = ? ORDER BY created_at DESC LIMIT ?").all(type, limit);
 	}
 	return db.prepare("SELECT id, type, actor, detail, created_at FROM events ORDER BY created_at DESC LIMIT ?").all(limit);
+}
+
+export function insertMediaRow({ userId, title, filename, mime, size, location = "", url = null, favorite = 0, archived = 0, createdAt = null }) {
+	const info = db.prepare("INSERT INTO media (user_id, title, filename, mime, size, location, url, favorite, archived, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(userId, title, filename, mime, size, location, url, favorite ? 1 : 0, archived ? 1 : 0, createdAt ?? Date.now());
+	return db.prepare("SELECT * FROM media WHERE id = ?").get(info.lastInsertRowid);
+}
+
+export function listMediaRows(userId) {
+	return db.prepare("SELECT * FROM media WHERE user_id = ? ORDER BY created_at DESC, id DESC").all(userId);
+}
+
+export function getMediaRow(id) {
+	return db.prepare("SELECT * FROM media WHERE id = ?").get(id);
+}
+
+export function deleteMediaRow(id) {
+	const row = db.prepare("SELECT * FROM media WHERE id = ?").get(id);
+	if (row) db.prepare("DELETE FROM media WHERE id = ?").run(id);
+	return row ?? null;
+}
+
+export function setMediaFavorite(id, favorite) {
+	db.prepare("UPDATE media SET favorite = ? WHERE id = ?").run(favorite ? 1 : 0, id);
+}
+
+export function setMediaArchived(id, archived) {
+	db.prepare("UPDATE media SET archived = ? WHERE id = ?").run(archived ? 1 : 0, id);
+}
+
+export function setMediaVaulted(id, vaulted) {
+	db.prepare("UPDATE media SET vaulted = ? WHERE id = ?").run(vaulted ? 1 : 0, id);
+}
+
+export function setMediaTrashed(id, trashed) {
+	db.prepare("UPDATE media SET trashed = ? WHERE id = ?").run(trashed ? 1 : 0, id);
+}
+
+export function renameMedia(id, title) {
+	db.prepare("UPDATE media SET title = ? WHERE id = ?").run(title, id);
+}
+
+export function sumMediaBytes(userId) {
+	return db.prepare("SELECT COALESCE(SUM(size), 0) AS c FROM media WHERE user_id = ?").get(userId).c;
 }

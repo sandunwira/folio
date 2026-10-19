@@ -1,14 +1,23 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { getSessionUser } from "@/lib/auth";
-import { getPlaces } from "@/lib/media-data";
+import { listUserMedia } from "@/lib/uploads";
 import MediaTitle, { toPublicUser } from "@/components/media-title";
 
 async function Content({ searchParams }) {
 	const { q } = await searchParams;
-	const query = q ?? "";
-	const user = toPublicUser(await getSessionUser());
-	const places = getPlaces(query);
+	const query = (q ?? "").toLowerCase();
+	const sessionUser = await getSessionUser();
+	const user = toPublicUser(sessionUser);
+	const photos = await listUserMedia(sessionUser.id, "media");
+	const places = photos.reduce((placeList, photo) => {
+		if (!photo.location) return placeList;
+		if (query && !photo.location.toLowerCase().includes(query)) return placeList;
+		const existing = placeList.find((place) => place.name === photo.location);
+		if (existing) existing.count += 1;
+		else placeList.push({ name: photo.location, cover: photo.image, count: 1 });
+		return placeList;
+	}, []);
 	return (
 		<section className="mx-auto max-w-360 px-3 pb-32 pt-4 sm:px-5 md:px-8 md:pt-6">
 			<MediaTitle title="Places" count={places.length} user={user} />

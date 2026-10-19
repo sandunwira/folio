@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { moveToVaultAction, renameMediaAction, toggleMediaFavoriteAction, trashMediaAction } from "@/lib/actions";
 import {
 	IconCheck,
 	IconChevronDown,
@@ -10,6 +11,7 @@ import {
 	IconDownload,
 	IconDotsVertical,
 	IconHeart,
+	IconHeartFilled,
 	IconInfoCircle,
 	IconLock,
 	IconPhoto,
@@ -25,8 +27,9 @@ function Icon({ icon: IconComponent, className = "", size = 20 }) {
 	return <IconComponent className={className} size={size} stroke={1.8} aria-hidden="true" />;
 }
 
-function MoreMenu({ open, setOpen }) {
+function MoreMenu({ open, setOpen, photo, onCopyLink, onVault, onRenameSubmit }) {
 	const menuRef = useRef(null);
+	const [renaming, setRenaming] = useState(false);
 
 	useEffect(() => {
 		if (!open) return;
@@ -52,10 +55,19 @@ function MoreMenu({ open, setOpen }) {
 				<Icon icon={IconDotsVertical} />
 			</button>
 			{open && (
-				<div className="absolute right-0 top-full z-10 mt-2 w-44 overflow-hidden rounded-xl border border-line bg-panel py-1.5 shadow-xl">
-					<button className={itemClass}>Rename</button>
-					<button className={itemClass}>Copy link</button>
-					<button className={itemClass}>Move to vault</button>
+				<div className="absolute right-0 top-full z-10 mt-2 w-48 overflow-hidden rounded-xl border border-line bg-panel py-1.5 shadow-xl">
+					{renaming ? (
+						<form action={onRenameSubmit} className="p-2">
+							<input type="hidden" name="id" value={photo.id} />
+							<input name="title" defaultValue={photo.title} autoFocus required placeholder="Media name" aria-label="Media name" className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none" />
+						</form>
+					) : (
+						<>
+							<button className={itemClass} onClick={() => setRenaming(true)}>Rename</button>
+							<button className={itemClass} onClick={onCopyLink}>Copy link</button>
+							<button className={itemClass} onClick={onVault}>Move to vault</button>
+						</>
+					)}
 				</div>
 			)}
 		</div>
@@ -70,6 +82,8 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 	const searchParams = useSearchParams();
 	const [selection, setSelection] = useState(new Set());
 	const [moreOpen, setMoreOpen] = useState(false);
+	const [infoOpen, setInfoOpen] = useState(false);
+	const [toast, setToast] = useState(null);
 
 	const queryText = query.toLowerCase();
 	const visiblePhotos = query ? photos.filter((photo) => `${photo.title} ${photo.location}`.toLowerCase().includes(queryText)) : photos;
@@ -112,6 +126,12 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [viewerIndex, visiblePhotos, moreOpen]);
 
+	useEffect(() => {
+		if (!toast) return;
+		const timer = setTimeout(() => setToast(null), 2500);
+		return () => clearTimeout(timer);
+	}, [toast]);
+
 	const toggleSelect = (id) => {
 		const next = new Set(selection);
 		if (next.has(id)) next.delete(id);
@@ -119,10 +139,77 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 		setSelection(next);
 	};
 
+	const flashToast = (result, okText, errorText) => {
+		setToast(result?.error ? { kind: "error", text: result.error ?? errorText ?? "Something went wrong." } : { kind: "ok", text: typeof okText === "function" ? okText(result) : okText });
+	};
+
+	const favoritePhoto = async (photo) => {
+		const result = await toggleMediaFavoriteAction(photo.id);
+		flashToast(result, (res) => (res.favorite ? "Added to favorites." : "Removed from favorites."));
+		router.refresh();
+	};
+
+	const deletePhoto = async (photo) => {
+		const result = await trashMediaAction(photo.id);
+		flashToast(result, (res) => (res.trashed ? "Moved to Trash." : "Deleted permanently."));
+		router.refresh();
+	};
+
+	const vaultPhoto = async (photo) => {
+		const result = await moveToVaultAction(photo.id);
+		flashToast(result, (res) => (res.vaulted ? "Moved to Vault." : "Removed from Vault."));
+		setMoreOpen(false);
+		router.refresh();
+	};
+
+	const copyViewerLink = async () => {
+		try {
+			await navigator.clipboard.writeText(window.location.href);
+			setToast({ kind: "ok", text: "Link copied to clipboard." });
+		} catch {
+			setToast({ kind: "error", text: "Couldn't copy the link." });
+		}
+		setMoreOpen(false);
+	};
+
+	const submitRename = async (formData) => {
+		const result = await renameMediaAction(formData);
+		flashToast(result, "Renamed successfully.");
+		setMoreOpen(false);
+		router.refresh();
+	};
+
+	const favoriteSelection = async () => {
+		const ids = [...selection];
+		const results = await Promise.all(ids.map((id) => toggleMediaFavoriteAction(id)));
+		if (results.some((res) => res?.error)) setToast({ kind: "error", text: results.find((res) => res?.error).error });
+		else setToast({ kind: "ok", text: `Favorites updated for ${ids.length} item${ids.length === 1 ? "" : "s"}.` });
+		setSelection(new Set());
+		router.refresh();
+	};
+
+	const trashSelection = async () => {
+		const ids = [...selection];
+		await Promise.all(ids.map((id) => trashMediaAction(id)));
+		setToast({ kind: "ok", text: `Moved ${ids.length} item${ids.length === 1 ? "" : "s"} to Trash.` });
+		setSelection(new Set());
+		router.refresh();
+	};
+
 	const fallbackState = query
 		? { iconKey: "search", title: "No results found", text: `No matches for "${query}". Try a different search.` }
 		: { iconKey: "photo", title: "No photos here", text: "Add some memories to get started." };
 	const info = sections.length === 0 ? { ...fallbackState, ...emptyState } : null;
+
+	const infoRows = viewerPhoto
+		? [
+				["File", viewerPhoto.title],
+				["Date", `${viewerPhoto.date} · ${viewerPhoto.time}`],
+				...(viewerPhoto.location ? [["Location", viewerPhoto.location]] : []),
+				["Type", viewerPhoto.mime],
+				...(viewerPhoto.size ? [["Size", viewerPhoto.size]] : []),
+			]
+		: [];
 
 	return (
 		<>
@@ -133,13 +220,13 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 					</button>
 					<span className="text-sm font-medium">{selection.size} selected</span>
 					<div className="ml-auto flex items-center gap-1">
-						<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" aria-label="Add to favorites">
+						<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" onClick={favoriteSelection} aria-label="Add to favorites">
 							<Icon icon={IconHeart} />
 						</button>
 						<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" aria-label="Share">
 							<Icon icon={IconShare} />
 						</button>
-						<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" aria-label="Delete">
+						<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" onClick={trashSelection} aria-label="Delete">
 							<Icon icon={IconTrash} />
 						</button>
 					</div>
@@ -164,6 +251,11 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 									{photo.type === "video" && (
 										<span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-black/40 text-white">
 											<Icon icon={IconPlayerPlay} size={12} />
+										</span>
+									)}
+									{photo.favorite && (
+										<span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-black/40 text-white" aria-label="Favorite">
+											<Icon icon={IconHeartFilled} size={12} />
 										</span>
 									)}
 									<span className={`absolute left-2 top-2 grid h-6 w-6 place-items-center rounded-full border-2 transition ${isSelected ? "border-white bg-ink text-white opacity-100" : "border-white bg-black/20 text-transparent opacity-0 group-hover:opacity-100"}`} onClick={(event) => { event.stopPropagation(); toggleSelect(photo.id); }} aria-label="Select photo">
@@ -200,19 +292,19 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 							<p className="text-sm font-medium">{viewerPhoto.title}</p>
 						</div>
 						<div className="flex items-center gap-1">
-							<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" aria-label="Favorite">
-								<Icon icon={IconHeart} />
+							<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" onClick={() => favoritePhoto(viewerPhoto)} aria-label={viewerPhoto.favorite ? "Remove from favorites" : "Add to favorites"}>
+								<Icon icon={viewerPhoto.favorite ? IconHeartFilled : IconHeart} />
 							</button>
-							<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" aria-label="Download">
+							<a className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" href={viewerPhoto.image} download target="_blank" rel="noreferrer" aria-label="Download">
 								<Icon icon={IconDownload} />
-							</button>
-							<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" aria-label="Info">
+							</a>
+							<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" onClick={() => setInfoOpen((value) => !value)} aria-label="Info" aria-pressed={infoOpen}>
 								<Icon icon={IconInfoCircle} />
 							</button>
-							<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" aria-label="Delete">
+							<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" onClick={() => deletePhoto(viewerPhoto)} aria-label="Delete">
 								<Icon icon={IconTrash} />
 							</button>
-							<MoreMenu open={moreOpen} setOpen={setMoreOpen} />
+							<MoreMenu key={viewerPhoto.id} open={moreOpen} setOpen={setMoreOpen} photo={viewerPhoto} onCopyLink={copyViewerLink} onVault={() => vaultPhoto(viewerPhoto)} onRenameSubmit={submitRename} />
 						</div>
 					</div>
 					<div className="flex flex-1 items-center overflow-hidden px-2 md:px-12" onClick={(event) => event.stopPropagation()}>
@@ -228,15 +320,33 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 							</button>
 						)}
 					</div>
+					{infoOpen && (
+						<div className="absolute bottom-16 left-1/2 z-10 max-h-[40vh] w-72 max-w-[86vw] -translate-x-1/2 overflow-y-auto rounded-xl bg-white/5 p-4 text-sm text-white backdrop-blur" onClick={(event) => event.stopPropagation()}>
+							<div className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-xs">
+								{infoRows.map(([label, value]) => (
+									<div key={label} className="col-span-2 grid grid-cols-subgrid">
+										<span className="text-white/60">{label}</span>
+										<span className="truncate text-right">{value}</span>
+									</div>
+								))}
+							</div>
+						</div>
+					)}
 					<div className="flex items-center justify-between px-5 pb-5 pt-3 text-white" onClick={(event) => event.stopPropagation()}>
 						<div className="text-sm">
 							<strong>{viewerPhoto.date}</strong>
 							<p className="text-xs text-white/60">{viewerPhoto.time}</p>
 						</div>
 						<div className="flex items-center gap-2 text-xs text-white/80">
-							<Icon icon={IconInfoCircle} size={14} /> {viewerPhoto.location}
+							<Icon icon={IconInfoCircle} size={14} /> {viewerPhoto.location || viewerPhoto.type}
 						</div>
 					</div>
+				</div>
+			)}
+
+			{toast && (
+				<div className="fixed bottom-24 left-1/2 z-[60] -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-xs font-medium text-white shadow-lg" role="status">
+					{toast.text}
 				</div>
 			)}
 		</>

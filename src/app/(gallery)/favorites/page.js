@@ -1,13 +1,14 @@
 import { Suspense } from "react";
 import { getSessionUser } from "@/lib/auth";
-import { favorites, photosData } from "@/lib/media-data";
+import { listUserMedia } from "@/lib/uploads";
 import MediaGrid from "@/components/media-grid";
 import MediaTitle, { toPublicUser } from "@/components/media-title";
 
 async function Content({ searchParams }) {
 	const { q } = await searchParams;
-	const user = toPublicUser(await getSessionUser());
-	const photos = photosData.filter((photo) => favorites.has(photo.id));
+	const sessionUser = await getSessionUser();
+	const user = toPublicUser(sessionUser);
+	const photos = await listUserMedia(sessionUser.id, "favorites");
 	return (
 		<section className="mx-auto max-w-360 px-3 pb-32 pt-4 sm:px-5 md:px-8 md:pt-6">
 			<MediaTitle title="Favorites" count={photos.length} user={user} />

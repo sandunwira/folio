@@ -1,7 +1,10 @@
 "use server";
 
+import { unlink } from "node:fs/promises";
+import path from "node:path";
 import { redirect } from "next/navigation";
-import { checkLogin, countAdmins, countUsers, createSession, createUser, destroySession, deleteUser, getSettings, getSessionUser, getUserByUsername, getUserById, listEvents, logEvent, setSettings } from "@/lib/auth";
+import { checkLogin, countAdmins, countUsers, createSession, createUser, deleteMediaRow, destroySession, deleteUser, getMediaRow, getSettings, getSessionUser, getUserByUsername, getUserById, listEvents, logEvent, renameMedia, setMediaFavorite, setMediaTrashed, setMediaVaulted, setSettings } from "@/lib/auth";
+import { UPLOAD_DIR } from "@/lib/uploads";
 
 const usernamePattern = /^[a-z0-9_.-]{2,32}$/;
 
@@ -102,4 +105,61 @@ export async function updateAdminSettingsAction(formData) {
 	setSettings({ maintenance: maintenance ? "on" : "off", session_days: String(sessionDays), quota_gb: String(quotaGb), used_gb: String(usedGb) });
 	logEvent("settings_updated", session.username, maintenance ? "Site settings updated (maintenance on)" : "Site settings updated");
 	redirect("/settings?saved=1");
+}
+
+function ownMedia(user, id) {
+	const row = Number.isInteger(id) ? getMediaRow(id) : null;
+	if (!row) return null;
+	if (row.user_id !== user.id && !user.isAdmin) return null;
+	return row;
+}
+
+export async function toggleMediaFavoriteAction(photoId) {
+	const user = await getSessionUser();
+	if (!user) return { ok: false, error: "Sign in first." };
+	const row = ownMedia(user, Number(photoId));
+	if (!row) return { ok: false, error: "Item not found." };
+	setMediaFavorite(row.id, !row.favorite);
+	logEvent(row.favorite ? "media_unfavorited" : "media_favorited", user.username, row.favorite ? `Removed "${row.title}" from favorites` : `Added "${row.title}" to favorites`);
+	return { ok: true, favorite: !row.favorite };
+}
+
+export async function renameMediaAction(formData) {
+	const user = await getSessionUser();
+	if (!user) return { ok: false, error: "Sign in first." };
+	const row = ownMedia(user, Number(formData.get("id")));
+	if (!row) return { ok: false, error: "Item not found." };
+	const title = String(formData.get("title") ?? "").trim().slice(0, 120);
+	if (!title) return { ok: false, error: "Name cannot be empty." };
+	renameMedia(row.id, title);
+	logEvent("media_renamed", user.username, `Renamed "${row.title}" to "${title}"`);
+	return { ok: true };
+}
+
+export async function moveToVaultAction(photoId) {
+	const user = await getSessionUser();
+	if (!user) return { ok: false, error: "Sign in first." };
+	const row = ownMedia(user, Number(photoId));
+	if (!row) return { ok: false, error: "Item not found." };
+	setMediaVaulted(row.id, !row.vaulted);
+	logEvent(row.vaulted ? "media_unvaulted" : "media_vaulted", user.username, row.vaulted ? `Removed "${row.title}" from the vault` : `Moved "${row.title}" to the vault`);
+	return { ok: true, vaulted: !row.vaulted };
+}
+
+export async function trashMediaAction(photoId) {
+	const user = await getSessionUser();
+	if (!user) return { ok: false, error: "Sign in first." };
+	const row = ownMedia(user, Number(photoId));
+	if (!row) return { ok: false, error: "Item not found." };
+	if (row.trashed) {
+		if (!row.url && row.filename) {
+			await unlink(path.join(UPLOAD_DIR, row.filename)).catch(() => {});
+		}
+		deleteMediaRow(row.id);
+		logEvent("media_deleted", user.username, `Permanently deleted "${row.title}"`);
+	} else {
+		setMediaTrashed(row.id, 1);
+		logEvent("media_trashed", user.username, `Moved "${row.title}" to Trash`);
+	}
+	return { ok: true, trashed: !row.trashed };
 }

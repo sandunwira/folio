@@ -17,6 +17,16 @@ export {
 	setSettings,
 	logEvent,
 	listEvents,
+	insertMediaRow,
+	listMediaRows,
+	getMediaRow,
+	deleteMediaRow,
+	setMediaFavorite,
+	setMediaArchived,
+	setMediaVaulted,
+	setMediaTrashed,
+	renameMedia,
+	sumMediaBytes,
 } from "./db";
 
 export async function createSession(userId, days = SESSION_DAYS) {
