@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import exifr from "exifr";
 import sharp from "sharp";
+import { convert as heicConvert } from "heic-convert";
 import { deleteMediaRow, getSettings, insertMediaRow, listAlbumMediaRows, listExpiredTrashRows, listMediaRows, setSettings } from "./db";
 import { estimateLocation } from "./geocode";
 import { SAMPLE_MEDIA } from "./media-data";
@@ -16,10 +17,17 @@ const THUMB_MIME = "image/jpeg";
 const thumbJobs = new Map();
 const thumbFailures = new Set();
 
-export async function writeThumbnail(mediaId, buffer) {
+export async function writeThumbnail(mediaId, buffer, mime = "") {
 	try {
+		let input = buffer;
+		let angle;
+		if (/^image\/hei[cf]$/.test(mime)) {
+			input = Buffer.from(await heicConvert({ buffer, format: "JPEG", quality: 0.95 }));
+			const orientation = await exifr.orientation(buffer).catch(() => 1);
+			angle = { 3: 180, 6: 90, 8: 270 }[orientation] ?? 0;
+		}
 		await mkdir(THUMB_DIR, { recursive: true });
-		await sharp(buffer).rotate().resize(THUMB_SIZE, THUMB_SIZE, { fit: "cover" }).jpeg({ quality: 82 }).toFile(path.join(THUMB_DIR, `${mediaId}.jpg`));
+		await sharp(input).rotate(angle).resize(THUMB_SIZE, THUMB_SIZE, { fit: "cover" }).jpeg({ quality: 82 }).toFile(path.join(THUMB_DIR, `${mediaId}.jpg`));
 		thumbFailures.delete(mediaId);
 		return true;
 	} catch {
@@ -39,7 +47,7 @@ export async function ensureThumbnail(row) {
 				let ok = false;
 				try {
 					const original = path.join(UPLOAD_DIR, row.filename);
-					ok = await writeThumbnail(row.id, await readFile(original));
+					ok = await writeThumbnail(row.id, await readFile(original), row.mime);
 				} catch {
 					ok = false;
 				} finally {
@@ -177,12 +185,12 @@ export function listAlbumMedia(userId, albumId) {
 	return listAlbumMediaRows(albumId, userId).map(mapMediaRow);
 }
 
-export async function saveUpload(file) {
+export async function saveUpload(file, mime) {
 	const buffer = Buffer.from(await file.arrayBuffer());
 	const ext = path.extname(file.name).toLowerCase().replace(/[^.a-z0-9]/g, "");
 	const storedName = `${randomUUID()}${ext}`;
 	await mkdir(UPLOAD_DIR, { recursive: true });
 	await writeFile(path.join(UPLOAD_DIR, storedName), buffer);
-	const meta = await extractUploadMeta(buffer, file.type);
+	const meta = await extractUploadMeta(buffer, mime);
 	return { storedName, size: file.size, buffer, ...meta };
 }

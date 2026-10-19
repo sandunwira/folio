@@ -1,3 +1,3 @@
-export default function Icon({ icon: IconComponent, className = "", size = 20 }) {
-	return <IconComponent className={className} size={size} stroke={1.8} aria-hidden="true" />;
+export default function Icon({ icon: IconComponent, className = "", size = 20, stroke = 1.8 }) {
+	return <IconComponent className={className} size={size} stroke={stroke} aria-hidden="true" />;
 }

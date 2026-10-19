@@ -54,7 +54,7 @@ async function Content({ searchParams }) {
 		<div className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-8 sm:px-6">
 			<div>
 				<h1 className="text-[22px] font-medium">Audit logs</h1>
-				<p className="mt-1 text-sm text-muted">Server and account activity. Media contents are never logged — only who did what, and when.</p>
+				<p className="mt-1 text-sm text-muted">Server and account activity. Media contents are never logged, only who did what, and when.</p>
 			</div>
 
 			<div className="flex flex-wrap gap-2">

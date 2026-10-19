@@ -2,6 +2,23 @@ import path from "node:path";
 import { getSettings, getSessionUser, insertMediaRow, logEvent, sumMediaBytes } from "@/lib/auth";
 import { saveUpload, writeThumbnail } from "@/lib/uploads";
 
+const EXT_MIME = {
+	".jpg": "image/jpeg",
+	".jpeg": "image/jpeg",
+	".png": "image/png",
+	".webp": "image/webp",
+	".gif": "image/gif",
+	".tif": "image/tiff",
+	".tiff": "image/tiff",
+	".avif": "image/avif",
+	".heic": "image/heic",
+	".heif": "image/heif",
+	".mp4": "video/mp4",
+	".m4v": "video/mp4",
+	".mov": "video/quicktime",
+	".webm": "video/webm",
+};
+
 export async function POST(request) {
 	const user = await getSessionUser();
 	if (!user) return Response.json({ error: "Sign in to upload." }, { status: 401 });
@@ -15,7 +32,8 @@ export async function POST(request) {
 	let badType = 0;
 	let overQuota = 0;
 	for (const file of files) {
-		if (!/^(image|video)\//.test(file.type) || file.size === 0) {
+		const mime = /^(image|video)\//.test(file.type) ? file.type : EXT_MIME[path.extname(file.name).toLowerCase()] ?? "";
+		if (!mime || file.size === 0) {
 			badType += 1;
 			continue;
 		}
@@ -23,20 +41,20 @@ export async function POST(request) {
 			overQuota += 1;
 			continue;
 		}
-		const saved = await saveUpload(file);
+		const saved = await saveUpload(file, mime);
 		const title = path.parse(file.name).name.slice(0, 120) || "Untitled";
 		const lastModified = Number(form.get("lastModified"));
 		const inserted = insertMediaRow({
 			userId: user.id,
 			title,
 			filename: saved.storedName,
-			mime: file.type,
+			mime,
 			size: saved.size,
 			location: saved.location ?? "",
 			est: saved.est ?? null,
 			createdAt: saved.createdAt ?? (Number.isFinite(lastModified) ? lastModified : Date.now()),
 		});
-		if (file.type.startsWith("image/")) await writeThumbnail(inserted.id, saved.buffer);
+		if (mime.startsWith("image/")) await writeThumbnail(inserted.id, saved.buffer, mime);
 		uploaded += 1;
 	}
 

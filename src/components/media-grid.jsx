@@ -21,6 +21,7 @@ import {
 	IconLocation,
 	IconMinus,
 	IconPhoto,
+	IconPhotoOff,
 	IconPlayerPlay,
 	IconSearch,
 	IconShare,
@@ -267,6 +268,8 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 	};
 
 	const [collapsedDates, setCollapsedDates] = useState(() => new Set());
+	const [cardPreviewFailures, setCardPreviewFailures] = useState(() => new Set());
+	const [viewerPreviewFailures, setViewerPreviewFailures] = useState(() => new Set());
 
 	const toggleCollapsedDate = (date) => {
 		setCollapsedDates((current) => {
@@ -370,7 +373,7 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 				{albumChoices === null ? (
 					<p className="px-2.5 py-1.5 text-white/60">Loading albums…</p>
 				) : albumChoices.length === 0 ? (
-					<p className="px-2.5 py-1.5 text-white/60">No albums yet — create one below.</p>
+					<p className="px-2.5 py-1.5 text-white/60">No albums yet, create one below.</p>
 				) : (
 					albumChoices.map((album) => (
 						<button key={album.id} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition hover:bg-white/10" onClick={() => addPhotoToAlbum(album, photo)}>
@@ -482,7 +485,15 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 								return (
 									<div key={photo.id} className="group relative">
 										<button className={`relative aspect-square overflow-hidden bg-[#ececec] outline-none transition focus-visible:ring-2 focus-visible:ring-ink ${isSelected ? "rounded-md ring-2 ring-inset ring-ink" : "rounded-lg"}`} onClick={() => (isSelected ? toggleSelect(photo.id) : setViewerPhoto(photo.id))}>
-											<img src={photo.image} alt={photo.title} loading="lazy" className="h-full w-full object-cover" />
+											{cardPreviewFailures.has(photo.id) ? (
+												<div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-white/60 text-muted">
+													<Icon icon={IconPhotoOff} size={26} />
+													<span className="text-[11px] font-medium text-ink">No preview</span>
+													<span className="text-[10px] text-faint">{photo.mime.split("/")[1].toUpperCase()}</span>
+												</div>
+											) : (
+												<img src={photo.image} alt={photo.title} loading="lazy" className="h-full w-full object-cover" onError={() => setCardPreviewFailures((current) => new Set(current).add(photo.id))} />
+											)}
 											{photo.type === "video" && (
 												<span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-black/40 text-white">
 													<Icon icon={IconPlayerPlay} size={12} />
@@ -543,7 +554,7 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 							<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" onClick={() => setViewerPhoto(null, "replace")} aria-label="Close">
 								<Icon icon={IconX} />
 							</button>
-							<p className="text-sm font-medium">{viewerPhoto.title}</p>
+							<p className="text-sm font-medium">{viewerPhoto.title}.{viewerPhoto.mime.split("/")[1].toLowerCase()}</p>
 						</div>
 						<div className="flex items-center gap-1">
 							<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 max-md:hidden" onClick={() => favoritePhoto(viewerPhoto)} aria-label={viewerPhoto.favorite ? "Remove from favorites" : "Add to favorites"}>
@@ -579,7 +590,18 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 								<Icon icon={IconChevronLeft} size={24} />
 							</button>
 						)}
-						<img src={viewerPhoto.large ?? viewerPhoto.image} alt={viewerPhoto.title} className="mx-auto max-h-[78vh] max-w-full object-contain md:max-w-[82vw]" />
+						{viewerPreviewFailures.has(viewerPhoto.id) ? (
+							<div className="mx-auto flex flex-col items-center gap-2 rounded-2xl bg-white/5 px-8 py-10 text-center text-white">
+								<Icon icon={IconPhotoOff} size={46} stroke={1} className="text-zinc-400 mb-4" />
+								<p className="text-sm font-medium">No preview available</p>
+								<p className="max-w-xs text-xs leading-5 text-white/60">{viewerPhoto.mime.toUpperCase()} - this browser can't display the original file format.</p>
+								<a href={viewerPhoto.large ?? viewerPhoto.image} download className="mt-1 rounded-full bg-white/15 px-4 py-2 text-xs font-medium text-white transition hover:bg-white/25" onClick={(event) => event.stopPropagation()}>
+									Download original
+								</a>
+							</div>
+						) : (
+							<img key={viewerPhoto.id} src={viewerPhoto.large ?? viewerPhoto.image} alt={viewerPhoto.title} className="mx-auto max-h-[78vh] max-w-full object-contain md:max-w-[82vw]" onError={() => setViewerPreviewFailures((current) => new Set(current).add(viewerPhoto.id))} />
+						)}
 						{viewerIndex < visiblePhotos.length - 1 && (
 							<button className="absolute right-3 z-10 grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white backdrop-blur hover:bg-white/20 md:right-5" onClick={() => setViewerPhoto(visiblePhotos[viewerIndex + 1].id, "replace")} aria-label="Next photo">
 								<Icon icon={IconChevronRight} size={24} />
