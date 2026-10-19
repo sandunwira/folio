@@ -28,6 +28,13 @@ export {
 	setMediaLocation,
 	setMediaEstLocation,
 	renameMedia,
+	createAlbum,
+	getAlbum,
+	listAlbums,
+	listAlbumMediaRows,
+	addAlbumMedia,
+	removeAlbumMedia,
+	deleteAlbumRow,
 	sumMediaBytes,
 } from "./db";
 

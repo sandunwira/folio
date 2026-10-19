@@ -2,15 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { moveToArchiveAction, moveToVaultAction, renameMediaAction, toggleMediaFavoriteAction, trashMediaAction } from "@/lib/actions";
-import { IconAperture, IconCamera, IconFocus2, IconSun } from "@tabler/icons-react";
+import { addMediaToAlbumAction, createAlbumAction, moveToArchiveAction, moveToVaultAction, removeMediaFromAlbumAction, renameMediaAction, toggleMediaFavoriteAction, trashMediaAction } from "@/lib/actions";
+import { IconAperture, IconCamera, IconFocus2, IconSun, IconPlus } from "@tabler/icons-react";
 import {
+	IconAlbum,
 	IconCheck,
 	IconChevronDown,
 	IconChevronLeft,
 	IconChevronRight,
 	IconDownload,
 	IconDotsVertical,
+	IconFolderPlus,
 	IconHeart,
 	IconHeartFilled,
 	IconInfoCircle,
@@ -111,7 +113,7 @@ function MoreMenu({ open, setOpen, photo, onCopyLink, onVault, onArchive, onRena
 
 const emptyIcons = { photo: IconPhoto, search: IconSearch, lock: IconLock, trash: IconTrash, wand: IconWand };
 
-export default function MediaGrid({ photos, query = "", emptyState = {} }) {
+export default function MediaGrid({ photos, query = "", emptyState = {}, addable = false, removableAlbumId = null }) {
 	const router = useRouter();
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
@@ -121,6 +123,11 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 	const [exifById, setExifById] = useState({});
 	const exifFetchRef = useRef({});
 	const [toast, setToast] = useState(null);
+	const [cardMenuFor, setCardMenuFor] = useState(null);
+	const [addToAlbumOpen, setAddToAlbumOpen] = useState(false);
+	const [albumChoices, setAlbumChoices] = useState(null);
+	const [albumNameInput, setAlbumNameInput] = useState("");
+	const albumMenuRef = useRef(null);
 
 	const queryText = query.toLowerCase();
 	const visiblePhotos = query ? photos.filter((photo) => `${photo.title} ${photo.estLocation || photo.location}`.toLowerCase().includes(queryText)) : photos;
@@ -145,9 +152,13 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 	};
 
 	useEffect(() => {
-		if (viewerIndex < 0) return;
+		if (viewerIndex < 0 && !addToAlbumOpen && !cardMenuFor) return;
 		const onKey = (event) => {
 			if (event.key === "Escape") {
+				if (addToAlbumOpen) {
+					setAddToAlbumOpen(false);
+					return;
+				}
 				if (moreOpen) {
 					setMoreOpen(false);
 					return;
@@ -161,7 +172,29 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [viewerIndex, visiblePhotos, moreOpen]);
+	}, [viewerIndex, visiblePhotos, moreOpen, addToAlbumOpen, cardMenuFor]);
+
+	useEffect(() => {
+		if (!cardMenuFor && !addToAlbumOpen) return;
+		const onPointerDown = (event) => {
+			if (albumMenuRef.current && !albumMenuRef.current.contains(event.target)) {
+				setCardMenuFor(null);
+				setAddToAlbumOpen(false);
+			}
+		};
+		const onKeyDown = (event) => {
+			if (event.key === "Escape") {
+				setCardMenuFor(null);
+				setAddToAlbumOpen(false);
+			}
+		};
+		document.addEventListener("mousedown", onPointerDown);
+		document.addEventListener("keydown", onKeyDown);
+		return () => {
+			document.removeEventListener("mousedown", onPointerDown);
+			document.removeEventListener("keydown", onKeyDown);
+		};
+	}, [cardMenuFor, addToAlbumOpen]);
 
 	useEffect(() => {
 		if (!toast) return;
@@ -221,6 +254,89 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 		setMoreOpen(false);
 		router.refresh();
 	};
+
+	const loadAlbumChoices = async () => {
+		try {
+			const response = await fetch("/api/albums");
+			const data = response.ok ? await response.json() : { albums: [] };
+			setAlbumChoices(data.albums ?? []);
+		} catch {
+			setAlbumChoices([]);
+		}
+	};
+
+	const openCardAlbumMenu = (photoId) => {
+		setAddToAlbumOpen(false);
+		setCardMenuFor(photoId);
+		loadAlbumChoices();
+	};
+
+	const toggleViewerAlbumMenu = () => {
+		setCardMenuFor(null);
+		if (addToAlbumOpen) {
+			setAddToAlbumOpen(false);
+			return;
+		}
+		setAddToAlbumOpen(true);
+		loadAlbumChoices();
+	};
+
+	const addPhotoToAlbum = async (album, photo) => {
+		const result = await addMediaToAlbumAction(album.id, photo.id);
+		flashToast(result, `Added to "${album.name}".`);
+		setCardMenuFor(null);
+		setAddToAlbumOpen(false);
+		router.refresh();
+	};
+
+	const removePhotoFromAlbum = async (photo) => {
+		const result = await removeMediaFromAlbumAction(removableAlbumId, photo.id);
+		flashToast(result, "Removed from album.");
+		setCardMenuFor(null);
+		router.refresh();
+	};
+
+	const createAlbumInline = async (event) => {
+		event.preventDefault();
+		const name = albumNameInput.trim();
+		if (!name) return;
+		const formData = new FormData();
+		formData.set("name", name);
+		const result = await createAlbumAction(formData);
+		flashToast(result, `Album "${name}" created.`);
+		if (!result.error) {
+			setAlbumNameInput("");
+			loadAlbumChoices();
+			router.refresh();
+		}
+	};
+
+	const renderAlbumMenuItems = (photo) => (
+		<>
+			<p className="px-2.5 pb-1.5 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-white/40">Add to album</p>
+			<div className="max-h-44 overflow-y-auto">
+				{albumChoices === null ? (
+					<p className="px-2.5 py-1.5 text-white/60">Loading albums…</p>
+				) : albumChoices.length === 0 ? (
+					<p className="px-2.5 py-1.5 text-white/60">No albums yet — create one below.</p>
+				) : (
+					albumChoices.map((album) => (
+						<button key={album.id} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition hover:bg-white/10" onClick={() => addPhotoToAlbum(album, photo)}>
+							<Icon icon={IconAlbum} size={15} />
+							<span className="min-w-0 flex-1 truncate">{album.name}</span>
+							<span className="text-white/40">{album.count}</span>
+						</button>
+					))
+				)}
+			</div>
+			<form onSubmit={createAlbumInline} className="mt-1 flex items-center gap-1.5 border-t border-white/10 px-2 py-2">
+				<input value={albumNameInput} onChange={(event) => setAlbumNameInput(event.target.value)} maxLength={80} placeholder="New album name" aria-label="New album name" className="min-w-0 flex-1 rounded-full border border-white/20 bg-transparent px-3 py-1 text-xs text-white placeholder:text-white/40 outline-none focus:border-white/50" />
+				<button type="submit" disabled={!albumNameInput.trim()} className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white/15 transition hover:bg-white/25 disabled:opacity-40" aria-label="Create album">
+					<Icon icon={IconPlus} size={14} />
+				</button>
+			</form>
+		</>
+	);
 
 	const copyViewerLink = async () => {
 		try {
@@ -300,28 +416,47 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 						{section.photos.map((photo) => {
 							const isSelected = selection.has(photo.id);
 							return (
-								<button key={photo.id} className={`group relative aspect-square overflow-hidden bg-[#ececec] outline-none transition focus-visible:ring-2 focus-visible:ring-ink ${isSelected ? "rounded-md ring-2 ring-inset ring-ink" : "rounded-lg"}`} onClick={() => (isSelected ? toggleSelect(photo.id) : setViewerPhoto(photo.id))}>
-									<img src={photo.image} alt={photo.title} loading="lazy" className="h-full w-full object-cover" />
-									{photo.type === "video" && (
-										<span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-black/40 text-white">
-											<Icon icon={IconPlayerPlay} size={12} />
+								<div key={photo.id} className="group relative">
+									<button className={`relative aspect-square overflow-hidden bg-[#ececec] outline-none transition focus-visible:ring-2 focus-visible:ring-ink ${isSelected ? "rounded-md ring-2 ring-inset ring-ink" : "rounded-lg"}`} onClick={() => (isSelected ? toggleSelect(photo.id) : setViewerPhoto(photo.id))}>
+										<img src={photo.image} alt={photo.title} loading="lazy" className="h-full w-full object-cover" />
+										{photo.type === "video" && (
+											<span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-black/40 text-white">
+												<Icon icon={IconPlayerPlay} size={12} />
+											</span>
+										)}
+										{photo.favorite && (
+											<span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-black/40 text-white" aria-label="Favorite">
+												<Icon icon={IconHeartFilled} size={12} />
+											</span>
+										)}
+										<span className={`absolute left-2 top-2 grid h-6 w-6 place-items-center rounded-full border-2 transition ${isSelected ? "border-white bg-ink text-white opacity-100" : "border-white bg-black/20 text-transparent opacity-0 group-hover:opacity-100"}`} onClick={(event) => { event.stopPropagation(); toggleSelect(photo.id); }} aria-label="Select photo">
+											<Icon icon={IconCheck} size={14} />
 										</span>
+										{(photo.estLocation || photo.location) && (
+											<span className="pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/50 to-transparent p-2 pt-6 text-left opacity-100 transition group-hover:opacity-100">
+												<span className="line-clamp-1 text-[11px] text-white">{[photo.estCity, photo.estCountry].filter(Boolean).join(", ")}</span>
+											</span>
+										)}
+										<span className="pointer-events-none absolute inset-0 hidden rounded-lg group-hover:block group-hover:bg-black/10" />
+									</button>
+									{(addable || removableAlbumId) && (
+										<button className={`absolute bottom-2 right-2 grid h-7 w-7 place-items-center rounded-full bg-black/40 text-white opacity-0 transition group-hover:opacity-100 ${cardMenuFor === photo.id ? "opacity-100" : ""}`} onClick={(event) => { event.stopPropagation(); openCardAlbumMenu(photo.id); }} aria-label="Album options">
+											<Icon icon={IconFolderPlus} size={15} />
+										</button>
 									)}
-									{photo.favorite && (
-										<span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-black/40 text-white" aria-label="Favorite">
-											<Icon icon={IconHeartFilled} size={12} />
-										</span>
+									{cardMenuFor === photo.id && (
+										<div ref={albumMenuRef} className="absolute bottom-11 right-2 z-10 w-56 rounded-xl border border-white/15 bg-zinc-900 p-1 text-xs text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+											{removableAlbumId ? (
+												<>
+													<p className="px-2.5 pb-1.5 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-white/40">Album actions</p>
+													<button className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition hover:bg-white/10" onClick={() => removePhotoFromAlbum(photo)}>
+														<Icon icon={IconTrash} size={15} /> Remove from album
+													</button>
+												</>
+											) : renderAlbumMenuItems(photo)}
+										</div>
 									)}
-									<span className={`absolute left-2 top-2 grid h-6 w-6 place-items-center rounded-full border-2 transition ${isSelected ? "border-white bg-ink text-white opacity-100" : "border-white bg-black/20 text-transparent opacity-0 group-hover:opacity-100"}`} onClick={(event) => { event.stopPropagation(); toggleSelect(photo.id); }} aria-label="Select photo">
-										<Icon icon={IconCheck} size={14} />
-									</span>
-									{(photo.estLocation || photo.location) && (
-										<span className="pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/50 to-transparent p-2 pt-6 text-left opacity-100 transition group-hover:opacity-100">
-											<span className="line-clamp-1 text-[11px] text-white">{[photo.estCity, photo.estCountry].filter(Boolean).join(", ")}</span>
-										</span>
-									)}
-									<span className="pointer-events-none absolute inset-0 hidden rounded-lg group-hover:block group-hover:bg-black/10" />
-								</button>
+								</div>
 							);
 						})}
 					</div>
@@ -352,6 +487,18 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 							<a className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" href={viewerPhoto.image} download target="_blank" rel="noreferrer" aria-label="Download">
 								<Icon icon={IconDownload} />
 							</a>
+							{addable && (
+								<div className="relative">
+									<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" onClick={toggleViewerAlbumMenu} aria-label="Add to album" aria-expanded={addToAlbumOpen}>
+										<Icon icon={IconFolderPlus} />
+									</button>
+									{addToAlbumOpen && (
+										<div ref={albumMenuRef} className="absolute right-0 top-full z-20 mt-2 w-60 rounded-xl border border-white/15 bg-zinc-900 py-1 text-xs text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+											{renderAlbumMenuItems(viewerPhoto)}
+										</div>
+									)}
+								</div>
+							)}
 							<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" onClick={() => setInfoOpen((value) => !value)} aria-label="Info" aria-pressed={infoOpen}>
 								<Icon icon={IconInfoCircle} />
 							</button>

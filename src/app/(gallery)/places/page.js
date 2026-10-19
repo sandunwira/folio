@@ -25,7 +25,7 @@ async function Content({ searchParams }) {
 			{places.length > 0 ? (
 				<div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
 					{places.map((place) => (
-						<Link key={place.name} href="/" className="group">
+						<Link key={place.name} href={`/places/${encodeURIComponent(place.name)}`} className="group">
 							<div className="relative aspect-square overflow-hidden rounded-xl bg-[#ececec]">
 								<img src={place.cover} alt={place.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" loading="lazy" />
 							</div>

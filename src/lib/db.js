@@ -6,7 +6,7 @@ const db = new Database(path.join(process.cwd(), "folio.db"));
 db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
 db.pragma("busy_timeout = 5000");
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const dbVersion = db.pragma("user_version", { simple: true });
 
 if (dbVersion < SCHEMA_VERSION) {
@@ -46,6 +46,19 @@ if (dbVersion < SCHEMA_VERSION) {
 			created_at INTEGER NOT NULL
 		);
 		CREATE INDEX IF NOT EXISTS media_user_created ON media(user_id, created_at DESC);
+		CREATE TABLE IF NOT EXISTS albums (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			name TEXT NOT NULL,
+			created_at INTEGER NOT NULL
+		);
+		CREATE TABLE IF NOT EXISTS album_media (
+			album_id INTEGER NOT NULL REFERENCES albums(id) ON DELETE CASCADE,
+			media_id INTEGER NOT NULL REFERENCES media(id) ON DELETE CASCADE,
+			created_at INTEGER NOT NULL,
+			PRIMARY KEY (album_id, media_id)
+		);
+		CREATE INDEX IF NOT EXISTS album_media_media ON album_media(media_id);
 	`);
 
 	for (const statement of [
@@ -236,6 +249,45 @@ export function listExpiredTrashRows(userId, days = 60) {
 export function listExpiredTrashRowsAll(days = 60) {
 	const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
 	return db.prepare("SELECT * FROM media WHERE trashed = 1 AND deleted_at > 0 AND deleted_at < ?").all(cutoff);
+}
+
+export function createAlbum(userId, name) {
+	const info = db.prepare("INSERT INTO albums (user_id, name, created_at) VALUES (?, ?, ?)").run(userId, name, Date.now());
+	return db.prepare("SELECT * FROM albums WHERE id = ?").get(info.lastInsertRowid);
+}
+
+export function getAlbum(userId, albumId) {
+	return db.prepare("SELECT id, user_id, name, created_at FROM albums WHERE id = ? AND user_id = ?").get(albumId, userId) ?? null;
+}
+
+export function listAlbums(userId) {
+	return db.prepare(`
+		SELECT a.id, a.name, a.created_at,
+			(SELECT COUNT(*) FROM album_media am WHERE am.album_id = a.id) AS item_count,
+			(SELECT am.media_id FROM album_media am WHERE am.album_id = a.id ORDER BY am.created_at DESC, am.media_id DESC LIMIT 1) AS cover_media_id
+		FROM albums a WHERE a.user_id = ? ORDER BY a.created_at DESC, a.id DESC
+	`).all(userId);
+}
+
+export function listAlbumMediaRows(albumId, userId) {
+	return db.prepare(`
+		SELECT m.* FROM album_media am
+		JOIN media m ON m.id = am.media_id
+		WHERE am.album_id = ? AND m.user_id = ? AND m.trashed = 0
+		ORDER BY m.created_at DESC, m.id DESC
+	`).all(albumId, userId);
+}
+
+export function addAlbumMedia(albumId, mediaId) {
+	db.prepare("INSERT OR IGNORE INTO album_media (album_id, media_id, created_at) VALUES (?, ?, ?)").run(albumId, mediaId, Date.now());
+}
+
+export function removeAlbumMedia(albumId, mediaId) {
+	db.prepare("DELETE FROM album_media WHERE album_id = ? AND media_id = ?").run(albumId, mediaId);
+}
+
+export function deleteAlbumRow(albumId) {
+	db.prepare("DELETE FROM albums WHERE id = ?").run(albumId);
 }
 
 export function renameMedia(id, title) {

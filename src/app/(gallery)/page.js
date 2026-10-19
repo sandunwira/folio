@@ -12,7 +12,7 @@ async function Content({ searchParams }) {
 	return (
 		<section className="mx-auto max-w-360 px-3 pb-32 pt-4 sm:px-5 md:px-8 md:pt-6">
 			<MediaTitle title="Media" count={photos.length} user={user} />
-			<MediaGrid photos={photos} query={q ?? ""} />
+			<MediaGrid photos={photos} query={q ?? ""} addable />
 		</section>
 	);
 }

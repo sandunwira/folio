@@ -2,7 +2,7 @@ import { mkdir, unlink, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import exifr from "exifr";
-import { deleteMediaRow, getSettings, insertMediaRow, listExpiredTrashRows, listMediaRows, setSettings } from "./db";
+import { deleteMediaRow, getSettings, insertMediaRow, listAlbumMediaRows, listExpiredTrashRows, listMediaRows, setSettings } from "./db";
 import { estimateLocation } from "./geocode";
 import { SAMPLE_MEDIA } from "./media-data";
 import { formatBytes } from "./format";
@@ -101,32 +101,36 @@ async function ensureSampleMedia(userId) {
 	setSettings({ [`samples_seeded_${userId}`]: "1" });
 }
 
+function mapMediaRow(row) {
+	const { date, time } = formatDateGroups(row.created_at);
+	return {
+		id: row.id,
+		title: row.title,
+		date,
+		time,
+		location: row.location ?? "",
+		estLocation: row.est_location ?? "",
+		estCity: row.est_city ?? "",
+		estCountry: row.est_country ?? "",
+		type: row.mime.startsWith("video/") ? "video" : "photo",
+		image: row.url || `/api/media/${row.id}`,
+		large: row.url ? row.url.replace("w=800", "w=1600") : `/api/media/${row.id}`,
+		mime: row.mime,
+		size: formatBytes(row.size),
+		favorite: !!row.favorite,
+		trashed: !!row.trashed,
+	};
+}
+
 export async function listUserMedia(userId, view = "media") {
 	await ensureSampleMedia(userId);
 	await purgeExpiredTrash(userId);
 	const filter = VIEW_FILTERS[view] ?? VIEW_FILTERS.media;
-	return listMediaRows(userId)
-		.filter(filter)
-		.map((row) => {
-			const { date, time } = formatDateGroups(row.created_at);
-			return {
-				id: row.id,
-				title: row.title,
-				date,
-				time,
-				location: row.location ?? "",
-				estLocation: row.est_location ?? "",
-				estCity: row.est_city ?? "",
-				estCountry: row.est_country ?? "",
-				type: row.mime.startsWith("video/") ? "video" : "photo",
-				image: row.url || `/api/media/${row.id}`,
-				large: row.url ? row.url.replace("w=800", "w=1600") : `/api/media/${row.id}`,
-				mime: row.mime,
-				size: formatBytes(row.size),
-				favorite: !!row.favorite,
-				trashed: !!row.trashed,
-			};
-		});
+	return listMediaRows(userId).filter(filter).map(mapMediaRow);
+}
+
+export function listAlbumMedia(userId, albumId) {
+	return listAlbumMediaRows(albumId, userId).map(mapMediaRow);
 }
 
 export async function saveUpload(file) {

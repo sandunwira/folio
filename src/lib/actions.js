@@ -3,7 +3,7 @@
 import { unlink } from "node:fs/promises";
 import path from "node:path";
 import { redirect } from "next/navigation";
-import { checkLogin, countAdmins, countUsers, createSession, createUser, deleteMediaRow, destroySession, deleteUser, getMediaRow, getSettings, getSessionUser, getUserByUsername, getUserById, listEvents, logEvent, renameMedia, setMediaArchived, setMediaFavorite, setMediaTrashed, setMediaVaulted, setSettings } from "@/lib/auth";
+import { checkLogin, countAdmins, countUsers, createAlbum, createSession, createUser, deleteMediaRow, destroySession, deleteUser, getAlbum, getMediaRow, getSettings, getSessionUser, getUserByUsername, getUserById, listEvents, logEvent, renameMedia, removeAlbumMedia, addAlbumMedia, setMediaArchived, setMediaFavorite, setMediaTrashed, setMediaVaulted, setSettings } from "@/lib/auth";
 import { UPLOAD_DIR } from "@/lib/uploads";
 
 const usernamePattern = /^[a-z0-9_.-]{2,32}$/;
@@ -153,6 +153,44 @@ export async function moveToArchiveAction(photoId) {
 	setMediaArchived(row.id, !row.archived);
 	logEvent(row.archived ? "media_unarchived" : "media_archived", user.username, row.archived ? `Removed "${row.title}" from the archive` : `Archived "${row.title}"`);
 	return { ok: true, archived: !row.archived };
+}
+
+export async function createAlbumAction(formData) {
+	const user = await getSessionUser();
+	if (!user) return { ok: false, error: "Sign in first." };
+	const name = String(formData.get("name") ?? "").trim().slice(0, 80);
+	if (!name) return { ok: false, error: "Album name is required." };
+	const album = createAlbum(user.id, name);
+	logEvent("album_created", user.username, `Created album "${name}"`);
+	return { ok: true, album: { id: album.id, name: album.name } };
+}
+
+async function sharedAlbum(user, albumId) {
+	return getAlbum(user.id, Number(albumId));
+}
+
+export async function addMediaToAlbumAction(albumId, photoId) {
+	const user = await getSessionUser();
+	if (!user) return { ok: false, error: "Sign in first." };
+	const album = await sharedAlbum(user, albumId);
+	if (!album) return { ok: false, error: "Album not found." };
+	const row = ownMedia(user, Number(photoId));
+	if (!row) return { ok: false, error: "Item not found." };
+	addAlbumMedia(album.id, row.id);
+	logEvent("media_added_to_album", user.username, `Added "${row.title}" to "${album.name}"`);
+	return { ok: true };
+}
+
+export async function removeMediaFromAlbumAction(albumId, photoId) {
+	const user = await getSessionUser();
+	if (!user) return { ok: false, error: "Sign in first." };
+	const album = await sharedAlbum(user, albumId);
+	if (!album) return { ok: false, error: "Album not found." };
+	const row = ownMedia(user, Number(photoId));
+	if (!row) return { ok: false, error: "Item not found." };
+	removeAlbumMedia(album.id, row.id);
+	logEvent("media_removed_from_album", user.username, `Removed "${row.title}" from "${album.name}"`);
+	return { ok: true };
 }
 
 export async function trashMediaAction(photoId) {
