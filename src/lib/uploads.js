@@ -1,6 +1,7 @@
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
+import exifr from "exifr";
 import { deleteMediaRow, getSettings, insertMediaRow, listExpiredTrashRows, listMediaRows, setSettings } from "./db";
 import { SAMPLE_MEDIA } from "./media-data";
 import { formatBytes } from "./format";
@@ -15,6 +16,34 @@ const VIEW_FILTERS = {
 	vault: (row) => row.vaulted && !row.trashed,
 	trash: (row) => row.trashed,
 };
+
+const EXIF_MIMES = new Set(["image/jpeg", "image/png", "image/heic", "image/heif", "image/tiff", "image/webp", "image/avif"]);
+
+async function extractUploadMeta(buffer, mime) {
+	if (!EXIF_MIMES.has(mime)) return {};
+	try {
+		const exif = await exifr.parse(buffer, { tiff: true, exif: true, gps: true });
+		if (!exif) return {};
+		const takenDate = ["DateTimeOriginal", "CreateDate", "ModifyDate"].map((key) => {
+			const value = exif[key];
+			if (value instanceof Date) return value.getTime();
+			const parsed = Date.parse(value);
+			return Number.isFinite(parsed) ? parsed : NaN;
+		}).find((value) => Number.isFinite(value));
+		let location = "";
+		if (Number.isFinite(exif.GPSLatitude) && Number.isFinite(exif.GPSLongitude)) {
+			const lat = `${Math.abs(exif.GPSLatitude).toFixed(4)}° ${exif.GPSLatitude >= 0 ? "N" : "S"}`;
+			const lon = `${Math.abs(exif.GPSLongitude).toFixed(4)}° ${exif.GPSLongitude >= 0 ? "E" : "W"}`;
+			location = `${lat}, ${lon}`;
+		}
+		const meta = {};
+		if (Number.isFinite(takenDate)) meta.createdAt = takenDate;
+		if (location) meta.location = location;
+		return meta;
+	} catch {
+		return {};
+	}
+}
 
 function formatDateGroups(ms) {
 	const then = new Date(ms);
@@ -90,9 +119,11 @@ export async function listUserMedia(userId, view = "media") {
 }
 
 export async function saveUpload(file) {
+	const buffer = Buffer.from(await file.arrayBuffer());
 	const ext = path.extname(file.name).toLowerCase().replace(/[^.a-z0-9]/g, "");
 	const storedName = `${randomUUID()}${ext}`;
 	await mkdir(UPLOAD_DIR, { recursive: true });
-	await writeFile(path.join(UPLOAD_DIR, storedName), Buffer.from(await file.arrayBuffer()));
-	return { storedName, size: file.size };
+	await writeFile(path.join(UPLOAD_DIR, storedName), buffer);
+	const meta = await extractUploadMeta(buffer, file.type);
+	return { storedName, size: file.size, ...meta };
 }

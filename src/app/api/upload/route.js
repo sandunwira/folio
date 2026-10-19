@@ -25,7 +25,16 @@ export async function POST(request) {
 		}
 		const saved = await saveUpload(file);
 		const title = path.parse(file.name).name.slice(0, 120) || "Untitled";
-		insertMediaRow({ userId: user.id, title, filename: saved.storedName, mime: file.type, size: saved.size });
+		const lastModified = Number(form.get("lastModified"));
+		insertMediaRow({
+			userId: user.id,
+			title,
+			filename: saved.storedName,
+			mime: file.type,
+			size: saved.size,
+			location: saved.location ?? "",
+			createdAt: saved.createdAt ?? (Number.isFinite(lastModified) ? lastModified : Date.now()),
+		});
 		uploaded += 1;
 	}
 

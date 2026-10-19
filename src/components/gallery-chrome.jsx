@@ -125,6 +125,7 @@ function uploadOne(file, onProgress) {
 	return new Promise((resolve, reject) => {
 		const form = new FormData();
 		form.append("files", file);
+		form.append("lastModified", String(file.lastModified ?? Date.now()));
 		const xhr = new XMLHttpRequest();
 		xhr.open("POST", "/api/upload");
 		xhr.upload.onprogress = (event) => {
