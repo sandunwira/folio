@@ -19,6 +19,7 @@ import {
 	IconLock,
 	IconMapPin,
 	IconLocation,
+	IconMinus,
 	IconPhoto,
 	IconPlayerPlay,
 	IconSearch,
@@ -256,6 +257,26 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 		setSelection(next);
 	};
 
+	const toggleSection = (section) => {
+		const ids = section.photos.map((photo) => photo.id);
+		const allSelected = ids.every((id) => selection.has(id));
+		const next = new Set(selection);
+		if (allSelected) ids.forEach((id) => next.delete(id));
+		else ids.forEach((id) => next.add(id));
+		setSelection(next);
+	};
+
+	const [collapsedDates, setCollapsedDates] = useState(() => new Set());
+
+	const toggleCollapsedDate = (date) => {
+		setCollapsedDates((current) => {
+			const next = new Set(current);
+			if (next.has(date)) next.delete(date);
+			else next.add(date);
+			return next;
+		});
+	};
+
 	const flashToast = (result, okText, errorText) => {
 		setToast(result?.error ? { kind: "error", text: result.error ?? errorText ?? "Something went wrong." } : { kind: "ok", text: typeof okText === "function" ? okText(result) : okText });
 	};
@@ -434,65 +455,78 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 				</div>
 			)}
 
-			{sections.map((section) => (
-				<div key={section.date} className="mb-6">
-					<div className="sticky top-16 z-10 mb-2 flex items-center gap-2 bg-surface py-2 md:top-1">
-						<h2 className="text-[15px] font-medium">{section.date}</h2>
-						<span className="text-xs text-muted">· {section.photos.length} items</span>
-						<button className="ml-1 grid h-7 w-7 place-items-center rounded-full text-muted hover:bg-black/5" aria-label="Collapse section">
-							<Icon icon={IconChevronDown} size={16} />
-						</button>
-					</div>
-					<div className="grid grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-						{section.photos.map((photo) => {
-							const isSelected = selection.has(photo.id);
-							return (
-								<div key={photo.id} className="group relative">
-									<button className={`relative aspect-square overflow-hidden bg-[#ececec] outline-none transition focus-visible:ring-2 focus-visible:ring-ink ${isSelected ? "rounded-md ring-2 ring-inset ring-ink" : "rounded-lg"}`} onClick={() => (isSelected ? toggleSelect(photo.id) : setViewerPhoto(photo.id))}>
-										<img src={photo.image} alt={photo.title} loading="lazy" className="h-full w-full object-cover" />
-										{photo.type === "video" && (
-											<span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-black/40 text-white">
-												<Icon icon={IconPlayerPlay} size={12} />
+			{sections.map((section) => {
+				const sectionSelected = section.photos.filter((photo) => selection.has(photo.id)).length;
+				const allSelected = sectionSelected === section.photos.length;
+				const collapsed = collapsedDates.has(section.date);
+				return (
+					<div key={section.date} className="mb-3">
+						<div className="sticky top-16 z-10 mb-2 flex items-center gap-2.5 bg-surface py-2 md:top-1">
+							<button
+								className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border transition ${allSelected ? "border-ink bg-ink text-white" : sectionSelected > 0 ? "border-ink bg-ink/10 text-ink" : "border-faint bg-panel text-transparent hover:border-ink"}`}
+								onClick={() => toggleSection(section)}
+								aria-label={allSelected ? "Deselect all in group" : "Select all in group"}
+								aria-pressed={allSelected}
+							>
+								<Icon icon={allSelected ? IconCheck : IconMinus} size={13} />
+							</button>
+							<h2 className="text-[15px] font-medium">{section.date}</h2>
+							<span className="text-xs text-muted">· {section.photos.length} items</span>
+							<button className={`ml-1 grid h-7 w-7 place-items-center rounded-full text-muted transition-transform duration-200 hover:bg-black/5 ${collapsed ? "-rotate-90" : ""}`} onClick={() => toggleCollapsedDate(section.date)} aria-label={collapsed ? "Expand section" : "Collapse section"} aria-expanded={!collapsed}>
+								<Icon icon={IconChevronDown} size={16} />
+							</button>
+						</div>
+						<div className={collapsed ? "hidden" : "grid grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"}>
+							{section.photos.map((photo) => {
+								const isSelected = selection.has(photo.id);
+								return (
+									<div key={photo.id} className="group relative">
+										<button className={`relative aspect-square overflow-hidden bg-[#ececec] outline-none transition focus-visible:ring-2 focus-visible:ring-ink ${isSelected ? "rounded-md ring-2 ring-inset ring-ink" : "rounded-lg"}`} onClick={() => (isSelected ? toggleSelect(photo.id) : setViewerPhoto(photo.id))}>
+											<img src={photo.image} alt={photo.title} loading="lazy" className="h-full w-full object-cover" />
+											{photo.type === "video" && (
+												<span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-black/40 text-white">
+													<Icon icon={IconPlayerPlay} size={12} />
+												</span>
+											)}
+											{photo.favorite && (
+												<span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-black/40 text-white" aria-label="Favorite">
+													<Icon icon={IconHeartFilled} size={12} />
+												</span>
+											)}
+											<span className={`absolute left-2 top-2 grid h-6 w-6 place-items-center rounded-full border-2 transition ${isSelected ? "border-white bg-ink text-white opacity-100" : "border-white bg-black/20 text-transparent opacity-0 group-hover:opacity-100"}`} onClick={(event) => { event.stopPropagation(); toggleSelect(photo.id); }} aria-label="Select photo">
+												<Icon icon={IconCheck} size={14} />
 											</span>
-										)}
-										{photo.favorite && (
-											<span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-black/40 text-white" aria-label="Favorite">
-												<Icon icon={IconHeartFilled} size={12} />
-											</span>
-										)}
-										<span className={`absolute left-2 top-2 grid h-6 w-6 place-items-center rounded-full border-2 transition ${isSelected ? "border-white bg-ink text-white opacity-100" : "border-white bg-black/20 text-transparent opacity-0 group-hover:opacity-100"}`} onClick={(event) => { event.stopPropagation(); toggleSelect(photo.id); }} aria-label="Select photo">
-											<Icon icon={IconCheck} size={14} />
-										</span>
-										{(photo.estLocation || photo.location) && (
-											<span className="pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/50 to-transparent p-2 pt-6 text-left opacity-100 transition group-hover:opacity-100">
-												<span className="line-clamp-1 text-[11px] text-white">{[photo.estCity, photo.estCountry].filter(Boolean).join(", ")}</span>
-											</span>
-										)}
-										<span className="pointer-events-none absolute inset-0 hidden rounded-lg group-hover:block group-hover:bg-black/10" />
-									</button>
-									{(addable || removableAlbumId) && (
-										<button className={`absolute bottom-2 right-2 grid h-7 w-7 place-items-center rounded-full bg-black/40 text-white opacity-0 transition group-hover:opacity-100 ${cardMenuFor === photo.id ? "opacity-100" : ""}`} onClick={(event) => { event.stopPropagation(); openCardAlbumMenu(photo.id); }} aria-label="Album options">
-											<Icon icon={IconFolderPlus} size={15} />
+											{(photo.estLocation || photo.location) && (
+												<span className="pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/50 to-transparent p-2 pt-6 text-left opacity-100 transition group-hover:opacity-100">
+													<span className="line-clamp-1 text-[11px] text-white">{[photo.estCity, photo.estCountry].filter(Boolean).join(", ")}</span>
+												</span>
+											)}
+											<span className="pointer-events-none absolute inset-0 hidden rounded-lg group-hover:block group-hover:bg-black/10" />
 										</button>
-									)}
-									{cardMenuFor === photo.id && (
-										<div ref={albumMenuRef} className="absolute bottom-11 right-2 z-30 w-56 rounded-xl border border-white/15 bg-zinc-900 p-1 text-xs text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-											{removableAlbumId ? (
-												<>
-													<p className="px-2.5 pb-1.5 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-white/40">Album actions</p>
-													<button className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition hover:bg-white/10" onClick={() => removePhotoFromAlbum(photo)}>
-														<Icon icon={IconTrash} size={15} /> Remove from album
-													</button>
-												</>
-											) : renderAlbumMenuItems(photo)}
-										</div>
-									)}
-								</div>
-							);
-						})}
+										{(addable || removableAlbumId) && (
+											<button className={`absolute bottom-2 right-2 grid h-7 w-7 place-items-center rounded-full bg-black/40 text-white opacity-0 transition group-hover:opacity-100 ${cardMenuFor === photo.id ? "opacity-100" : ""}`} onClick={(event) => { event.stopPropagation(); openCardAlbumMenu(photo.id); }} aria-label="Album options">
+												<Icon icon={IconFolderPlus} size={15} />
+											</button>
+										)}
+										{cardMenuFor === photo.id && (
+											<div ref={albumMenuRef} className="absolute bottom-11 right-2 z-30 w-56 rounded-xl border border-white/15 bg-zinc-900 p-1 text-xs text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+												{removableAlbumId ? (
+													<>
+														<p className="px-2.5 pb-1.5 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-white/40">Album actions</p>
+														<button className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition hover:bg-white/10" onClick={() => removePhotoFromAlbum(photo)}>
+															<Icon icon={IconTrash} size={15} /> Remove from album
+														</button>
+													</>
+												) : renderAlbumMenuItems(photo)}
+											</div>
+										)}
+									</div>
+								);
+							})}
+						</div>
 					</div>
-				</div>
-			))}
+				);
+			})}
 
 			{info && (
 				<div className="py-28 text-center">
