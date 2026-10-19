@@ -3,6 +3,7 @@ import Link from "next/link";
 import { IconAlbum, IconPlus } from "@tabler/icons-react";
 import { getSessionUser, listAlbums } from "@/lib/auth";
 import NewAlbumForm from "@/components/new-album-form";
+import AlbumMenu from "@/components/album-menu";
 import MediaTitle, { toPublicUser } from "@/components/media-title";
 
 async function Content({ searchParams }) {
@@ -20,17 +21,22 @@ async function Content({ searchParams }) {
 			{visibleAlbums.length > 0 ? (
 				<div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
 					{visibleAlbums.map((album) => (
-						<Link key={album.id} href={`/albums/${album.id}`} className="group">
-							<div className="relative aspect-square overflow-hidden rounded-xl bg-[#ececec]">
-								{album.cover_media_id ? <img src={`/api/media/${album.cover_media_id}`} alt={album.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" loading="lazy" /> : (
-									<div className="grid h-full w-full place-items-center text-muted">
-										<IconAlbum size={28} stroke={1.5} aria-hidden="true" />
-									</div>
-								)}
+						<div key={album.id} className="group relative">
+							<Link href={`/albums/${album.id}`} className="block">
+								<div className="relative aspect-square overflow-hidden rounded-xl bg-[#ececec]">
+									{album.cover_media_id ? <img src={`/api/media/${album.cover_media_id}`} alt={album.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" loading="lazy" /> : (
+										<div className="grid h-full w-full place-items-center text-muted">
+											<IconAlbum size={28} stroke={1.5} aria-hidden="true" />
+										</div>
+									)}
+								</div>
+								<p className="mt-2.5 truncate text-sm font-medium">{album.name}</p>
+								<p className="text-xs text-muted">{album.item_count} {album.item_count === 1 ? "item" : "items"}</p>
+							</Link>
+							<div className="absolute right-2 top-2">
+								<AlbumMenu album={{ id: album.id, name: album.name }} variant="card" deletedHref="/albums" />
 							</div>
-							<p className="mt-2.5 truncate text-sm font-medium">{album.name}</p>
-							<p className="text-xs text-muted">{album.item_count} {album.item_count === 1 ? "item" : "items"}</p>
-						</Link>
+						</div>
 					))}
 				</div>
 			) : (

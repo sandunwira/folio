@@ -34,6 +34,7 @@ export {
 	listAlbumMediaRows,
 	addAlbumMedia,
 	removeAlbumMedia,
+	renameAlbum,
 	deleteAlbumRow,
 	sumMediaBytes,
 } from "./db";

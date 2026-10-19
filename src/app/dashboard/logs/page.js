@@ -33,6 +33,8 @@ const eventLabels = {
 	media_trashed: "Moved to trash",
 	media_deleted: "Deleted permanently",
 	album_created: "Album created",
+	album_renamed: "Album renamed",
+	album_deleted: "Album deleted",
 	media_added_to_album: "Added to album",
 	media_removed_from_album: "Removed from album",
 	logout: "Logout",

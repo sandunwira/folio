@@ -286,6 +286,10 @@ export function removeAlbumMedia(albumId, mediaId) {
 	db.prepare("DELETE FROM album_media WHERE album_id = ? AND media_id = ?").run(albumId, mediaId);
 }
 
+export function renameAlbum(id, name) {
+	db.prepare("UPDATE albums SET name = ? WHERE id = ?").run(name, id);
+}
+
 export function deleteAlbumRow(albumId) {
 	db.prepare("DELETE FROM albums WHERE id = ?").run(albumId);
 }

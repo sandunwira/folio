@@ -3,7 +3,7 @@
 import { unlink } from "node:fs/promises";
 import path from "node:path";
 import { redirect } from "next/navigation";
-import { checkLogin, countAdmins, countUsers, createAlbum, createSession, createUser, deleteMediaRow, destroySession, deleteUser, getAlbum, getMediaRow, getSettings, getSessionUser, getUserByUsername, getUserById, listEvents, logEvent, renameMedia, removeAlbumMedia, addAlbumMedia, setMediaArchived, setMediaFavorite, setMediaTrashed, setMediaVaulted, setSettings } from "@/lib/auth";
+import { checkLogin, countAdmins, countUsers, createAlbum, createSession, createUser, deleteAlbumRow, deleteMediaRow, destroySession, deleteUser, getAlbum, getMediaRow, getSettings, getSessionUser, getUserByUsername, getUserById, listEvents, logEvent, renameAlbum, renameMedia, addAlbumMedia, removeAlbumMedia, setMediaArchived, setMediaFavorite, setMediaTrashed, setMediaVaulted, setSettings } from "@/lib/auth";
 import { UPLOAD_DIR } from "@/lib/uploads";
 
 const usernamePattern = /^[a-z0-9_.-]{2,32}$/;
@@ -163,6 +163,28 @@ export async function createAlbumAction(formData) {
 	const album = createAlbum(user.id, name);
 	logEvent("album_created", user.username, `Created album "${name}"`);
 	return { ok: true, album: { id: album.id, name: album.name } };
+}
+
+export async function renameAlbumAction(formData) {
+	const user = await getSessionUser();
+	if (!user) return { ok: false, error: "Sign in first." };
+	const album = getAlbum(user.id, Number(formData.get("albumId")));
+	if (!album) return { ok: false, error: "Album not found." };
+	const name = String(formData.get("name") ?? "").trim().slice(0, 80);
+	if (!name) return { ok: false, error: "Album name is required." };
+	renameAlbum(album.id, name);
+	logEvent("album_renamed", user.username, `Renamed album "${album.name}" to "${name}"`);
+	return { ok: true };
+}
+
+export async function deleteAlbumAction(albumId) {
+	const user = await getSessionUser();
+	if (!user) return { ok: false, error: "Sign in first." };
+	const album = getAlbum(user.id, Number(albumId));
+	if (!album) return { ok: false, error: "Album not found." };
+	deleteAlbumRow(album.id);
+	logEvent("album_deleted", user.username, `Deleted album "${album.name}"`);
+	return { ok: true };
 }
 
 async function sharedAlbum(user, albumId) {
