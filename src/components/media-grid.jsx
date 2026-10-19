@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { moveToArchiveAction, moveToVaultAction, renameMediaAction, toggleMediaFavoriteAction, trashMediaAction } from "@/lib/actions";
+import { IconAperture, IconCamera, IconFocus2, IconSun } from "@tabler/icons-react";
 import {
 	IconCheck,
 	IconChevronDown,
@@ -14,6 +15,8 @@ import {
 	IconHeartFilled,
 	IconInfoCircle,
 	IconLock,
+	IconMapPin,
+	IconLocation,
 	IconPhoto,
 	IconPlayerPlay,
 	IconSearch,
@@ -23,6 +26,40 @@ import {
 	IconX,
 } from "@tabler/icons-react";
 import Icon from "@/components/icon";
+
+function formatExifDate(iso) {
+	const parsed = Date.parse(iso);
+	return Number.isFinite(parsed) ? new Date(parsed).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : null;
+}
+
+function formatExifTime(iso) {
+	const parsed = Date.parse(iso);
+	return Number.isFinite(parsed) ? new Date(parsed).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : null;
+}
+
+function buildInfoRows(photo, exifInfo) {
+	const rows = [];
+	const exif = exifInfo?.exif && typeof exifInfo.exif === "object" ? exifInfo.exif : null;
+	rows.push(["File", `${photo.title}.${photo.mime.split("/")[1].toLowerCase()}`]);
+	const captured = exif ? ["DateTimeOriginal", "CreateDate", "ModifyDate"].map((key) => exif[key]).find(Boolean) : null;
+	rows.push(["Date", `${(captured ? formatExifTime(captured) : null) ?? photo.time}, ${(captured ? formatExifDate(captured) : null) ?? photo.date}`]);
+	const width = exif ? (exif.ExifImageWidth ?? exif.ImageWidth) : null;
+	const height = exif ? (exif.ExifImageHeight ?? exif.ImageHeight) : null;
+	if (width && height) rows.push(["Resolution", `${width} × ${height}`]);
+	if (photo.size) rows.push(["Size", photo.size]);
+	const cameraChips = [];
+	const camera = exif ? [exif.Make, exif.Model].filter(Boolean).join(" ") : null;
+	if (camera) cameraChips.push({ icon: IconCamera, text: camera });
+	if (exif?.FocalLength != null) {
+		const focal = `${Number(exif.FocalLength).toFixed(1)} mm`;
+		const equiv = exif.FocalLengthIn35mmFormat != null ? ` (${Number(exif.FocalLengthIn35mmFormat).toFixed(0)} mm equiv.)` : "";
+		cameraChips.push({ icon: IconFocus2, text: `${focal}${equiv}` });
+	}
+	if (exif?.FNumber != null) cameraChips.push({ icon: IconAperture, text: `f/${exif.FNumber}` });
+	if (exif?.ISO != null) cameraChips.push({ icon: IconSun, text: `ISO ${exif.ISO}` });
+	if (cameraChips.length > 0) rows.push(["Camera", cameraChips]);
+	return rows;
+}
 
 function MoreMenu({ open, setOpen, photo, onCopyLink, onVault, onArchive, onRenameSubmit }) {
 	const menuRef = useRef(null);
@@ -81,10 +118,12 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 	const [selection, setSelection] = useState(new Set());
 	const [moreOpen, setMoreOpen] = useState(false);
 	const [infoOpen, setInfoOpen] = useState(false);
+	const [exifById, setExifById] = useState({});
+	const exifFetchRef = useRef({});
 	const [toast, setToast] = useState(null);
 
 	const queryText = query.toLowerCase();
-	const visiblePhotos = query ? photos.filter((photo) => `${photo.title} ${photo.location}`.toLowerCase().includes(queryText)) : photos;
+	const visiblePhotos = query ? photos.filter((photo) => `${photo.title} ${photo.estLocation || photo.location}`.toLowerCase().includes(queryText)) : photos;
 
 	const sections = visiblePhotos.reduce((groups, photo) => {
 		const last = groups[groups.length - 1];
@@ -129,6 +168,22 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 		const timer = setTimeout(() => setToast(null), 2500);
 		return () => clearTimeout(timer);
 	}, [toast]);
+
+	useEffect(() => {
+		const photoId = infoOpen ? (viewerPhoto?.id ?? null) : null;
+		if (!photoId || exifFetchRef.current[photoId]) return;
+		exifFetchRef.current[photoId] = true;
+		const loadExif = async () => {
+			try {
+				const response = await fetch(`/api/media/${photoId}/exif`);
+				const data = response.ok ? await response.json() : { exif: {}, place: null };
+				setExifById((prev) => ({ ...prev, [photoId]: { exif: data.exif ?? {}, place: data.place ?? null } }));
+			} catch {
+				setExifById((prev) => ({ ...prev, [photoId]: { exif: {}, place: null } }));
+			}
+		};
+		loadExif();
+	}, [infoOpen, viewerPhoto?.id]);
 
 	const toggleSelect = (id) => {
 		const next = new Set(selection);
@@ -208,15 +263,7 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 		: { iconKey: "photo", title: "No photos here", text: "Add some memories to get started." };
 	const info = sections.length === 0 ? { ...fallbackState, ...emptyState } : null;
 
-	const infoRows = viewerPhoto
-		? [
-			["File", viewerPhoto.title],
-			["Date", `${viewerPhoto.date} · ${viewerPhoto.time}`],
-			...(viewerPhoto.location ? [["Location", viewerPhoto.location]] : []),
-			["Type", viewerPhoto.mime],
-			...(viewerPhoto.size ? [["Size", viewerPhoto.size]] : []),
-		]
-		: [];
+	const infoRows = viewerPhoto ? buildInfoRows(viewerPhoto, exifById[viewerPhoto.id] ?? null) : [];
 
 	return (
 		<>
@@ -268,9 +315,9 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 									<span className={`absolute left-2 top-2 grid h-6 w-6 place-items-center rounded-full border-2 transition ${isSelected ? "border-white bg-ink text-white opacity-100" : "border-white bg-black/20 text-transparent opacity-0 group-hover:opacity-100"}`} onClick={(event) => { event.stopPropagation(); toggleSelect(photo.id); }} aria-label="Select photo">
 										<Icon icon={IconCheck} size={14} />
 									</span>
-									{photo.location && (
+									{(photo.estLocation || photo.location) && (
 										<span className="pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/50 to-transparent p-2 pt-6 text-left opacity-100 transition group-hover:opacity-100">
-											<span className="line-clamp-1 text-[11px] text-white">{photo.location}</span>
+											<span className="line-clamp-1 text-[11px] text-white">{photo.estLocation || photo.location}</span>
 										</span>
 									)}
 									<span className="pointer-events-none absolute inset-0 hidden rounded-lg group-hover:block group-hover:bg-black/10" />
@@ -328,12 +375,22 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 						)}
 					</div>
 					{infoOpen && (
-						<div className="absolute bottom-16 left-1/2 z-10 max-h-[40vh] w-72 max-w-[86vw] -translate-x-1/2 overflow-y-auto rounded-xl bg-white/5 p-4 text-sm text-white backdrop-blur" onClick={(event) => event.stopPropagation()}>
+						<div className="absolute bottom-24 left-1/2 z-10 max-h-[40vh] w-[80vw] md:w-[50vw] max-w-[86vw] -translate-x-1/2 overflow-y-auto rounded-xl bg-zinc-800 p-4 text-sm text-white drop-shadow-2xl drop-shadow-black" onClick={(event) => event.stopPropagation()}>
 							<div className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-xs">
 								{infoRows.map(([label, value]) => (
 									<div key={label} className="col-span-2 grid grid-cols-subgrid">
-										<span className="text-white/60">{label}</span>
-										<span className="truncate text-right">{value}</span>
+										<span className="shrink-0 text-white/60">{label}</span>
+										{Array.isArray(value) ? (
+											<span className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-right">
+												{value.map((item) => (
+													<span key={item.text} className="inline-flex items-center gap-1">
+														<Icon icon={item.icon} size={13} /> {item.text}
+													</span>
+												))}
+											</span>
+										) : (
+											<span className="break-all text-right">{value}</span>
+										)}
 									</div>
 								))}
 							</div>
@@ -344,9 +401,11 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 							<strong>{viewerPhoto.date}</strong>
 							<p className="text-xs text-white/60">{viewerPhoto.time}</p>
 						</div>
-						<div className="flex items-center gap-2 text-xs text-white/80">
-							<Icon icon={IconInfoCircle} size={14} /> {viewerPhoto.location || viewerPhoto.type}
-						</div>
+						{(viewerPhoto.estLocation || viewerPhoto.location) && (
+							<div className="flex items-center gap-2 text-xs text-white/80">
+								<Icon icon={IconLocation} size={14} /> {viewerPhoto.estLocation || viewerPhoto.location}
+							</div>
+						)}
 					</div>
 				</div>
 			)}

@@ -25,6 +25,8 @@ export {
 	setMediaArchived,
 	setMediaVaulted,
 	setMediaTrashed,
+	setMediaLocation,
+	setMediaEstLocation,
 	renameMedia,
 	sumMediaBytes,
 } from "./db";

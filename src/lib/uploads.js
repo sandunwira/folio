@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import exifr from "exifr";
 import { deleteMediaRow, getSettings, insertMediaRow, listExpiredTrashRows, listMediaRows, setSettings } from "./db";
+import { estimateLocation } from "./geocode";
 import { SAMPLE_MEDIA } from "./media-data";
 import { formatBytes } from "./format";
 
@@ -22,23 +23,30 @@ const EXIF_MIMES = new Set(["image/jpeg", "image/png", "image/heic", "image/heif
 async function extractUploadMeta(buffer, mime) {
 	if (!EXIF_MIMES.has(mime)) return {};
 	try {
-		const exif = await exifr.parse(buffer, { tiff: true, exif: true, gps: true });
-		if (!exif) return {};
+		const exif = await exifr.parse(buffer, { tiff: true, exif: true, reviveValues: true });
+		let latitude = null;
+		let longitude = null;
+		try {
+			const gps = await exifr.gps(buffer);
+			if (Number.isFinite(gps?.latitude) && Number.isFinite(gps?.longitude)) {
+				latitude = gps.latitude;
+				longitude = gps.longitude;
+			}
+		} catch {
+			latitude = null;
+		}
 		const takenDate = ["DateTimeOriginal", "CreateDate", "ModifyDate"].map((key) => {
-			const value = exif[key];
+			const value = exif?.[key];
 			if (value instanceof Date) return value.getTime();
 			const parsed = Date.parse(value);
 			return Number.isFinite(parsed) ? parsed : NaN;
 		}).find((value) => Number.isFinite(value));
-		let location = "";
-		if (Number.isFinite(exif.GPSLatitude) && Number.isFinite(exif.GPSLongitude)) {
-			const lat = `${Math.abs(exif.GPSLatitude).toFixed(4)}° ${exif.GPSLatitude >= 0 ? "N" : "S"}`;
-			const lon = `${Math.abs(exif.GPSLongitude).toFixed(4)}° ${exif.GPSLongitude >= 0 ? "E" : "W"}`;
-			location = `${lat}, ${lon}`;
-		}
 		const meta = {};
 		if (Number.isFinite(takenDate)) meta.createdAt = takenDate;
-		if (location) meta.location = location;
+		if (latitude != null) {
+			meta.location = `${Math.abs(latitude).toFixed(4)}° ${latitude >= 0 ? "N" : "S"}, ${Math.abs(longitude).toFixed(4)}° ${longitude >= 0 ? "E" : "W"}`;
+			meta.est = await estimateLocation(latitude, longitude);
+		}
 		return meta;
 	} catch {
 		return {};
@@ -107,6 +115,7 @@ export async function listUserMedia(userId, view = "media") {
 				date,
 				time,
 				location: row.location ?? "",
+				estLocation: row.est_location ?? "",
 				type: row.mime.startsWith("video/") ? "video" : "photo",
 				image: row.url || `/api/media/${row.id}`,
 				large: row.url ? row.url.replace("w=800", "w=1600") : `/api/media/${row.id}`,

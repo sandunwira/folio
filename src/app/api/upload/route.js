@@ -33,6 +33,7 @@ export async function POST(request) {
 			mime: file.type,
 			size: saved.size,
 			location: saved.location ?? "",
+			est: saved.est ?? null,
 			createdAt: saved.createdAt ?? (Number.isFinite(lastModified) ? lastModified : Date.now()),
 		});
 		uploaded += 1;

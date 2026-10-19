@@ -5,7 +5,12 @@ import path from "node:path";
 const db = new Database(path.join(process.cwd(), "folio.db"));
 db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
-db.exec(`
+db.pragma("busy_timeout = 5000");
+const SCHEMA_VERSION = 2;
+const dbVersion = db.pragma("user_version", { simple: true });
+
+if (dbVersion < SCHEMA_VERSION) {
+	db.exec(`
 		CREATE TABLE IF NOT EXISTS users (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			username TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -43,24 +48,31 @@ db.exec(`
 		CREATE INDEX IF NOT EXISTS media_user_created ON media(user_id, created_at DESC);
 	`);
 
-
-for (const statement of [
-	"ALTER TABLE media ADD COLUMN url TEXT",
-	"ALTER TABLE media ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0",
-	"ALTER TABLE media ADD COLUMN archived INTEGER NOT NULL DEFAULT 0",
-	"ALTER TABLE media ADD COLUMN vaulted INTEGER NOT NULL DEFAULT 0",
-	"ALTER TABLE media ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
-	"ALTER TABLE media ADD COLUMN deleted_at INTEGER NOT NULL DEFAULT 0",
-]) {
-	try {
-		db.exec(statement);
-	} catch (error) {
-		if (!String(error).includes("duplicate column")) throw error;
+	for (const statement of [
+		"ALTER TABLE media ADD COLUMN url TEXT",
+		"ALTER TABLE media ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0",
+		"ALTER TABLE media ADD COLUMN archived INTEGER NOT NULL DEFAULT 0",
+		"ALTER TABLE media ADD COLUMN vaulted INTEGER NOT NULL DEFAULT 0",
+		"ALTER TABLE media ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
+		"ALTER TABLE media ADD COLUMN deleted_at INTEGER NOT NULL DEFAULT 0",
+		"ALTER TABLE media ADD COLUMN est_location TEXT",
+		"ALTER TABLE media ADD COLUMN est_city TEXT",
+		"ALTER TABLE media ADD COLUMN est_district TEXT",
+		"ALTER TABLE media ADD COLUMN est_state TEXT",
+		"ALTER TABLE media ADD COLUMN est_country TEXT",
+	]) {
+		try {
+			db.exec(statement);
+		} catch (error) {
+			if (!String(error).includes("duplicate column")) throw error;
+		}
 	}
-}
 
-db.prepare("DELETE FROM media WHERE user_id NOT IN (SELECT id FROM users)").run();
-db.prepare("DELETE FROM sessions WHERE user_id NOT IN (SELECT id FROM users)").run();
+	db.prepare("DELETE FROM media WHERE user_id NOT IN (SELECT id FROM users)").run();
+	db.prepare("DELETE FROM sessions WHERE user_id NOT IN (SELECT id FROM users)").run();
+
+	db.pragma(`user_version = ${SCHEMA_VERSION}`);
+}
 
 const DEFAULT_SETTINGS = {
 	app_name: "Folio",
@@ -172,9 +184,18 @@ export function listEvents(limit = 100, type) {
 	return db.prepare("SELECT id, type, actor, detail, created_at FROM events ORDER BY created_at DESC LIMIT ?").all(limit);
 }
 
-export function insertMediaRow({ userId, title, filename, mime, size, location = "", url = null, favorite = 0, archived = 0, createdAt = null }) {
-	const info = db.prepare("INSERT INTO media (user_id, title, filename, mime, size, location, url, favorite, archived, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(userId, title, filename, mime, size, location, url, favorite ? 1 : 0, archived ? 1 : 0, createdAt ?? Date.now());
+export function insertMediaRow({ userId, title, filename, mime, size, location = "", est = null, url = null, favorite = 0, archived = 0, createdAt = null }) {
+	const info = db.prepare("INSERT INTO media (user_id, title, filename, mime, size, location, est_location, est_city, est_district, est_state, est_country, url, favorite, archived, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(userId, title, filename, mime, size, location, est?.location ?? null, est?.city ?? null, est?.district ?? null, est?.state ?? null, est?.country ?? null, url, favorite ? 1 : 0, archived ? 1 : 0, createdAt ?? Date.now());
 	return db.prepare("SELECT * FROM media WHERE id = ?").get(info.lastInsertRowid);
+}
+
+export function setMediaLocation(id, location) {
+	db.prepare("UPDATE media SET location = ? WHERE id = ?").run(location);
+}
+
+export function setMediaEstLocation(id, est) {
+	if (!est) return;
+	db.prepare("UPDATE media SET est_location = ?, est_city = ?, est_district = ?, est_state = ?, est_country = ? WHERE id = ?").run(est.location ?? null, est.city ?? null, est.district ?? null, est.state ?? null, est.country ?? null, id);
 }
 
 export function listMediaRows(userId) {
