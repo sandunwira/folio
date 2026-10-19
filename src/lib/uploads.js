@@ -1,8 +1,9 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { getSettings, insertMediaRow, listMediaRows, setSettings } from "./db";
+import { deleteMediaRow, getSettings, insertMediaRow, listExpiredTrashRows, listMediaRows, setSettings } from "./db";
 import { SAMPLE_MEDIA } from "./media-data";
+import { formatBytes } from "./format";
 
 export const UPLOAD_DIR = path.join(process.cwd(), "data", "uploads");
 
@@ -31,12 +32,15 @@ function formatDateGroups(ms) {
 	};
 }
 
-function formatBytes(bytes) {
-	if (!bytes || bytes <= 0) return null;
-	if (bytes < 1024) return `${bytes} B`;
-	if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
-	if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
-	return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+async function purgeExpiredTrash(userId) {
+	const days = Number(getSettings().trash_days) || 60;
+	const expired = listExpiredTrashRows(userId, days);
+	for (const row of expired) {
+		if (!row.url && row.filename) {
+			await unlink(path.join(UPLOAD_DIR, row.filename)).catch(() => { });
+		}
+		deleteMediaRow(row.id);
+	}
 }
 
 async function ensureSampleMedia(userId) {
@@ -62,6 +66,7 @@ async function ensureSampleMedia(userId) {
 
 export async function listUserMedia(userId, view = "media") {
 	await ensureSampleMedia(userId);
+	await purgeExpiredTrash(userId);
 	const filter = VIEW_FILTERS[view] ?? VIEW_FILTERS.media;
 	return listMediaRows(userId)
 		.filter(filter)
@@ -75,6 +80,7 @@ export async function listUserMedia(userId, view = "media") {
 				location: row.location ?? "",
 				type: row.mime.startsWith("video/") ? "video" : "photo",
 				image: row.url || `/api/media/${row.id}`,
+				large: row.url ? row.url.replace("w=800", "w=1600") : `/api/media/${row.id}`,
 				mime: row.mime,
 				size: formatBytes(row.size),
 				favorite: !!row.favorite,

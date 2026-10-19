@@ -17,18 +17,19 @@ function Logo() {
 	);
 }
 
-async function Content({ params }) {
+async function Content({ searchParams }) {
 	const user = await getSessionUser();
 	if (user) redirect("/");
-	const { error } = await params;
+	const { error } = await searchParams;
 	const isFirstUser = countUsers() === 0;
+	const settings = getSettings();
 
 	return (
 		<div className="grid min-h-screen place-items-center bg-surface p-5">
 			<div className="w-full max-w-sm">
 				<div className="flex flex-col items-center">
 					<Logo />
-					<p className="mt-3 text-xl font-medium text-ink">Folio</p>
+					<p className="mt-3 text-xl font-medium text-ink">{settings.app_name}</p>
 					<p className="text-sm text-muted">Your personal archive</p>
 				</div>
 				<div className="mt-8 rounded-3xl border border-line bg-panel p-7">
@@ -83,7 +84,7 @@ async function Content({ params }) {
 export default async function LoginPage(props) {
 	return (
 		<Suspense>
-			<Content params={props.searchParams} />
+			<Content searchParams={props.searchParams} />
 		</Suspense>
 	);
 }

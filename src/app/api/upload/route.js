@@ -12,14 +12,15 @@ export async function POST(request) {
 
 	const quotaBytes = Number(getSettings().quota_gb) * 1024 ** 3;
 	let uploaded = 0;
-	let skipped = 0;
+	let badType = 0;
+	let overQuota = 0;
 	for (const file of files) {
 		if (!/^(image|video)\//.test(file.type) || file.size === 0) {
-			skipped += 1;
+			badType += 1;
 			continue;
 		}
 		if (sumMediaBytes(user.id) + file.size > quotaBytes) {
-			skipped += 1;
+			overQuota += 1;
 			continue;
 		}
 		const saved = await saveUpload(file);
@@ -29,7 +30,8 @@ export async function POST(request) {
 	}
 
 	if (uploaded > 0) logEvent("media_uploaded", user.username, `${uploaded} item${uploaded === 1 ? "" : "s"} uploaded`);
-	if (skipped > 0) logEvent("media_upload_skipped", user.username, `${skipped} item${skipped === 1 ? "" : "s"} skipped (unsupported or over quota)`);
+	if (badType > 0) logEvent("media_upload_skipped", user.username, `${badType} item${badType === 1 ? "" : "s"} skipped (unsupported file type)`);
+	if (overQuota > 0) logEvent("media_upload_skipped", user.username, `${overQuota} item${overQuota === 1 ? "" : "s"} skipped (storage quota reached)`);
 
-	return Response.json({ uploaded, skipped });
+	return Response.json({ uploaded, badType, overQuota });
 }

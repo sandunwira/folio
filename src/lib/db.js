@@ -4,6 +4,7 @@ import path from "node:path";
 
 const db = new Database(path.join(process.cwd(), "folio.db"));
 db.pragma("journal_mode = WAL");
+db.pragma("foreign_keys = ON");
 db.exec(`
 		CREATE TABLE IF NOT EXISTS users (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,25 +44,31 @@ db.exec(`
 	`);
 
 
-	for (const statement of [
-		"ALTER TABLE media ADD COLUMN url TEXT",
-		"ALTER TABLE media ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0",
-		"ALTER TABLE media ADD COLUMN archived INTEGER NOT NULL DEFAULT 0",
-		"ALTER TABLE media ADD COLUMN vaulted INTEGER NOT NULL DEFAULT 0",
-		"ALTER TABLE media ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
-	]) {
-		try {
-			db.exec(statement);
-		} catch (error) {
-			if (!String(error).includes("duplicate column")) throw error;
-		}
+for (const statement of [
+	"ALTER TABLE media ADD COLUMN url TEXT",
+	"ALTER TABLE media ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0",
+	"ALTER TABLE media ADD COLUMN archived INTEGER NOT NULL DEFAULT 0",
+	"ALTER TABLE media ADD COLUMN vaulted INTEGER NOT NULL DEFAULT 0",
+	"ALTER TABLE media ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
+	"ALTER TABLE media ADD COLUMN deleted_at INTEGER NOT NULL DEFAULT 0",
+]) {
+	try {
+		db.exec(statement);
+	} catch (error) {
+		if (!String(error).includes("duplicate column")) throw error;
 	}
+}
+
+db.prepare("DELETE FROM media WHERE user_id NOT IN (SELECT id FROM users)").run();
+db.prepare("DELETE FROM sessions WHERE user_id NOT IN (SELECT id FROM users)").run();
 
 const DEFAULT_SETTINGS = {
+	app_name: "Folio",
 	maintenance: "off",
 	session_days: "30",
 	quota_gb: "15",
 	used_gb: "5.7",
+	trash_days: "60",
 };
 
 export const SESSION_COOKIE = "folio_session";
@@ -157,6 +164,9 @@ export function logEvent(type, actor, detail) {
 
 export function listEvents(limit = 100, type) {
 	if (type) {
+		if (type === "media") {
+			return db.prepare("SELECT id, type, actor, detail, created_at FROM events WHERE type LIKE 'media%' ORDER BY created_at DESC LIMIT ?").all(limit);
+		}
 		return db.prepare("SELECT id, type, actor, detail, created_at FROM events WHERE type = ? ORDER BY created_at DESC LIMIT ?").all(type, limit);
 	}
 	return db.prepare("SELECT id, type, actor, detail, created_at FROM events ORDER BY created_at DESC LIMIT ?").all(limit);
@@ -194,7 +204,17 @@ export function setMediaVaulted(id, vaulted) {
 }
 
 export function setMediaTrashed(id, trashed) {
-	db.prepare("UPDATE media SET trashed = ? WHERE id = ?").run(trashed ? 1 : 0, id);
+	db.prepare("UPDATE media SET trashed = ?, deleted_at = ? WHERE id = ?").run(trashed ? 1 : 0, trashed ? Date.now() : 0, id);
+}
+
+export function listExpiredTrashRows(userId, days = 60) {
+	const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+	return db.prepare("SELECT * FROM media WHERE user_id = ? AND trashed = 1 AND deleted_at > 0 AND deleted_at < ?").all(userId, cutoff);
+}
+
+export function listExpiredTrashRowsAll(days = 60) {
+	const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+	return db.prepare("SELECT * FROM media WHERE trashed = 1 AND deleted_at > 0 AND deleted_at < ?").all(cutoff);
 }
 
 export function renameMedia(id, title) {

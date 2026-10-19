@@ -8,10 +8,10 @@ function Avatar({ name }) {
 	return <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-ink text-xs font-medium text-white">{(name?.[0] ?? "?").toUpperCase()}</span>;
 }
 
-async function Content({ params }) {
+async function Content({ searchParams }) {
 	const user = await getSessionUser();
 	if (!user?.isAdmin) redirect("/");
-	const { error } = await params;
+	const { error } = await searchParams;
 	const users = listUsers();
 
 	return (
@@ -93,7 +93,7 @@ async function Content({ params }) {
 export default async function AdminUsersPage(props) {
 	return (
 		<Suspense>
-			<Content params={props.searchParams} />
+			<Content searchParams={props.searchParams} />
 		</Suspense>
 	);
 }

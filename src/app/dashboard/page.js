@@ -18,12 +18,12 @@ function StatCard({ label, value, sub, children }) {
 async function Content() {
 	const user = await getSessionUser();
 	if (!user?.isAdmin) redirect("/");
-	const settings = await getSettings();
-	const users = await countUsers();
-	const admins = await countAdmins();
+	const settings = getSettings();
+	const users = countUsers();
+	const admins = countAdmins();
 	const members = users - admins;
-	const activeSessions = await countActiveSessions();
-	const recent = (await recentUsers(5)).map((account) => ({
+	const activeSessions = countActiveSessions();
+	const recent = recentUsers(5).map((account) => ({
 		...account,
 		date: new Date(account.created_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }),
 	}));

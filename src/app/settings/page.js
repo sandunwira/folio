@@ -7,11 +7,11 @@ import { logoutAction, updateAdminSettingsAction } from "@/lib/actions";
 
 export const metadata = { title: "Settings | Folio" };
 
-async function Content({ params }) {
+async function Content({ searchParams }) {
 	const user = await getSessionUser();
 	if (!user) redirect("/login");
-	const { error, saved } = await params;
-	const settings = await getSettings();
+	const { error, saved } = await searchParams;
+	const settings = getSettings();
 
 	return (
 		<div className="min-h-screen bg-surface text-ink">
@@ -72,6 +72,11 @@ async function Content({ params }) {
 							<p className="mt-1 text-xs text-muted">These settings control the whole archive for every account.</p>
 						</div>
 						<form action={updateAdminSettingsAction} className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2">
+							<label className="flex flex-col gap-1.5 sm:col-span-2">
+								<span className="text-xs font-medium text-ink">Site name</span>
+								<input name="appName" type="text" maxLength={40} required defaultValue={settings.app_name} className="h-10 rounded-full border border-line bg-surface px-4 text-sm text-ink outline-none focus:border-ink" />
+								<span className="text-[11px] text-faint">Shown as the brand in the gallery sidebar.</span>
+							</label>
 							<label className="flex flex-col gap-1.5">
 								<span className="text-xs font-medium text-ink">Session lifetime (days)</span>
 								<input name="sessionDays" type="number" min={1} max={365} required defaultValue={settings.session_days} className="h-10 rounded-full border border-line bg-surface px-4 text-sm text-ink outline-none focus:border-ink" />
@@ -79,11 +84,7 @@ async function Content({ params }) {
 							<label className="flex flex-col gap-1.5">
 								<span className="text-xs font-medium text-ink">Storage quota (GB)</span>
 								<input name="quotaGb" type="number" min={1} step="any" required defaultValue={settings.quota_gb} className="h-10 rounded-full border border-line bg-surface px-4 text-sm text-ink outline-none focus:border-ink" />
-							</label>
-							<label className="flex flex-col gap-1.5">
-								<span className="text-xs font-medium text-ink">Storage used (GB)</span>
-								<input name="usedGb" type="number" min={0} step="any" required defaultValue={settings.used_gb} className="h-10 rounded-full border border-line bg-surface px-4 text-sm text-ink outline-none focus:border-ink" />
-								<span className="text-[11px] text-faint">Manual placeholder — this value is auto-computed from <code>data/uploads</code> whenever the uploads folder exists.</span>
+								<span className="text-[11px] text-faint">Actual usage is auto-computed from <code>data/uploads</code>.</span>
 							</label>
 							<div className="flex flex-col gap-1.5">
 								<span className="text-xs font-medium text-ink">Maintenance mode</span>
@@ -106,7 +107,7 @@ async function Content({ params }) {
 export default async function SettingsPage(props) {
 	return (
 		<Suspense>
-			<Content params={props.searchParams} />
+			<Content searchParams={props.searchParams} />
 		</Suspense>
 	);
 }

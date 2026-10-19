@@ -10,6 +10,7 @@ const eventFilters = [
 	{ key: "account_created", label: "Account created" },
 	{ key: "account_deleted", label: "Account deleted" },
 	{ key: "settings_updated", label: "Settings" },
+	{ key: "media", label: "Media" },
 	{ key: "logout", label: "Logouts" },
 ];
 
@@ -20,13 +21,24 @@ const eventLabels = {
 	account_created: "Account created",
 	account_deleted: "Account deleted",
 	settings_updated: "Settings updated",
+	media_uploaded: "Media uploaded",
+	media_upload_skipped: "Upload skipped",
+	media_favorited: "Added to favorites",
+	media_unfavorited: "Removed from favorites",
+	media_renamed: "Media renamed",
+	media_vaulted: "Moved to vault",
+	media_unvaulted: "Removed from vault",
+	media_archived: "Archived",
+	media_unarchived: "Unarchived",
+	media_trashed: "Moved to trash",
+	media_deleted: "Deleted permanently",
 	logout: "Logout",
 };
 
-async function Content({ params }) {
+async function Content({ searchParams }) {
 	const user = await getSessionUser();
 	if (!user?.isAdmin) redirect("/");
-	const { type } = await params;
+	const { type } = await searchParams;
 	const events = listEvents(100, type || undefined)
 		.map((event) => ({
 			...event,
@@ -77,7 +89,7 @@ async function Content({ params }) {
 export default async function AdminLogsPage(props) {
 	return (
 		<Suspense>
-			<Content params={props.searchParams} />
+			<Content searchParams={props.searchParams} />
 		</Suspense>
 	);
 }

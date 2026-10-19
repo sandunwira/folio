@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { moveToVaultAction, renameMediaAction, toggleMediaFavoriteAction, trashMediaAction } from "@/lib/actions";
+import { moveToArchiveAction, moveToVaultAction, renameMediaAction, toggleMediaFavoriteAction, trashMediaAction } from "@/lib/actions";
 import {
 	IconCheck,
 	IconChevronDown,
@@ -22,12 +22,9 @@ import {
 	IconWand,
 	IconX,
 } from "@tabler/icons-react";
+import Icon from "@/components/icon";
 
-function Icon({ icon: IconComponent, className = "", size = 20 }) {
-	return <IconComponent className={className} size={size} stroke={1.8} aria-hidden="true" />;
-}
-
-function MoreMenu({ open, setOpen, photo, onCopyLink, onVault, onRenameSubmit }) {
+function MoreMenu({ open, setOpen, photo, onCopyLink, onVault, onArchive, onRenameSubmit }) {
 	const menuRef = useRef(null);
 	const [renaming, setRenaming] = useState(false);
 
@@ -65,6 +62,7 @@ function MoreMenu({ open, setOpen, photo, onCopyLink, onVault, onRenameSubmit })
 						<>
 							<button className={itemClass} onClick={() => setRenaming(true)}>Rename</button>
 							<button className={itemClass} onClick={onCopyLink}>Copy link</button>
+							<button className={itemClass} onClick={onArchive}>Move to archive</button>
 							<button className={itemClass} onClick={onVault}>Move to vault</button>
 						</>
 					)}
@@ -162,6 +160,13 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 		router.refresh();
 	};
 
+	const archivePhoto = async (photo) => {
+		const result = await moveToArchiveAction(photo.id);
+		flashToast(result, (res) => (res.archived ? "Moved to Archive." : "Removed from Archive."));
+		setMoreOpen(false);
+		router.refresh();
+	};
+
 	const copyViewerLink = async () => {
 		try {
 			await navigator.clipboard.writeText(window.location.href);
@@ -190,8 +195,10 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 
 	const trashSelection = async () => {
 		const ids = [...selection];
-		await Promise.all(ids.map((id) => trashMediaAction(id)));
-		setToast({ kind: "ok", text: `Moved ${ids.length} item${ids.length === 1 ? "" : "s"} to Trash.` });
+		const results = await Promise.all(ids.map((id) => trashMediaAction(id)));
+		const failure = results.find((res) => res?.error);
+		if (failure) setToast({ kind: "error", text: failure.error });
+		else setToast({ kind: "ok", text: `Moved ${ids.length} item${ids.length === 1 ? "" : "s"} to Trash.` });
 		setSelection(new Set());
 		router.refresh();
 	};
@@ -203,12 +210,12 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 
 	const infoRows = viewerPhoto
 		? [
-				["File", viewerPhoto.title],
-				["Date", `${viewerPhoto.date} · ${viewerPhoto.time}`],
-				...(viewerPhoto.location ? [["Location", viewerPhoto.location]] : []),
-				["Type", viewerPhoto.mime],
-				...(viewerPhoto.size ? [["Size", viewerPhoto.size]] : []),
-			]
+			["File", viewerPhoto.title],
+			["Date", `${viewerPhoto.date} · ${viewerPhoto.time}`],
+			...(viewerPhoto.location ? [["Location", viewerPhoto.location]] : []),
+			["Type", viewerPhoto.mime],
+			...(viewerPhoto.size ? [["Size", viewerPhoto.size]] : []),
+		]
 		: [];
 
 	return (
@@ -304,7 +311,7 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 							<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" onClick={() => deletePhoto(viewerPhoto)} aria-label="Delete">
 								<Icon icon={IconTrash} />
 							</button>
-							<MoreMenu key={viewerPhoto.id} open={moreOpen} setOpen={setMoreOpen} photo={viewerPhoto} onCopyLink={copyViewerLink} onVault={() => vaultPhoto(viewerPhoto)} onRenameSubmit={submitRename} />
+							<MoreMenu key={viewerPhoto.id} open={moreOpen} setOpen={setMoreOpen} photo={viewerPhoto} onCopyLink={copyViewerLink} onVault={() => vaultPhoto(viewerPhoto)} onArchive={() => archivePhoto(viewerPhoto)} onRenameSubmit={submitRename} />
 						</div>
 					</div>
 					<div className="flex flex-1 items-center overflow-hidden px-2 md:px-12" onClick={(event) => event.stopPropagation()}>
@@ -313,7 +320,7 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 								<Icon icon={IconChevronLeft} size={24} />
 							</button>
 						)}
-						<img src={viewerPhoto.image.replace("w=800", "w=1400")} alt={viewerPhoto.title} className="mx-auto max-h-[78vh] max-w-full object-contain md:max-w-[82vw]" />
+						<img src={viewerPhoto.large ?? viewerPhoto.image} alt={viewerPhoto.title} className="mx-auto max-h-[78vh] max-w-full object-contain md:max-w-[82vw]" />
 						{viewerIndex < visiblePhotos.length - 1 && (
 							<button className="absolute right-3 z-10 grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white backdrop-blur hover:bg-white/20 md:right-5" onClick={() => setViewerPhoto(visiblePhotos[viewerIndex + 1].id, "replace")} aria-label="Next photo">
 								<Icon icon={IconChevronRight} size={24} />
@@ -345,7 +352,7 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 			)}
 
 			{toast && (
-				<div className="fixed bottom-24 left-1/2 z-[60] -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-xs font-medium text-white shadow-lg" role="status">
+				<div className="fixed bottom-24 left-1/2 z-60 -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-xs font-medium text-white shadow-lg" role="status">
 					{toast.text}
 				</div>
 			)}

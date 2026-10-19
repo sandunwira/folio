@@ -23,10 +23,8 @@ import {
 	IconWand,
 	IconX,
 } from "@tabler/icons-react";
-
-function Icon({ icon: IconComponent, className = "", size = 20 }) {
-	return <IconComponent className={className} size={size} stroke={1.8} aria-hidden="true" />;
-}
+import Icon from "@/components/icon";
+import { formatBytes } from "@/lib/format";
 
 const navItems = [
 	{ href: "/", label: "Media", icon: IconPhoto },
@@ -121,14 +119,6 @@ function UploadModal({ onClose, onSubmit }) {
 			</div>
 		</div>
 	);
-}
-
-function formatBytes(bytes) {
-	if (!bytes || bytes <= 0) return "0 B";
-	if (bytes < 1024) return `${bytes} B`;
-	if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
-	if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
-	return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
 }
 
 function uploadOne(file, onProgress) {
@@ -232,7 +222,7 @@ export default function GalleryChrome({ brand, storage }) {
 		patchItem(index, { status: "uploading", progress: 0 });
 		try {
 			const data = await uploadOne(file, (fraction) => patchItem(index, { progress: fraction }));
-			patchItem(index, { status: data.skipped > 0 ? "skipped" : "done", progress: 1 });
+			patchItem(index, { status: data.uploaded > 0 ? "done" : "skipped", progress: 1 });
 		} catch {
 			patchItem(index, { status: "failed" });
 		}

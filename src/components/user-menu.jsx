@@ -3,11 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { logoutAction } from "@/lib/actions";
+import Icon from "@/components/icon";
 import { IconLayoutDashboard, IconPower, IconSettings } from "@tabler/icons-react";
-
-function Icon({ icon: IconComponent, className = "", size = 20 }) {
-	return <IconComponent className={className} size={size} stroke={1.8} aria-hidden="true" />;
-}
 
 export default function UserMenu({ user, className = "" }) {
 	const [open, setOpen] = useState(false);

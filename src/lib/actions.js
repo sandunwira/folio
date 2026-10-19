@@ -3,7 +3,7 @@
 import { unlink } from "node:fs/promises";
 import path from "node:path";
 import { redirect } from "next/navigation";
-import { checkLogin, countAdmins, countUsers, createSession, createUser, deleteMediaRow, destroySession, deleteUser, getMediaRow, getSettings, getSessionUser, getUserByUsername, getUserById, listEvents, logEvent, renameMedia, setMediaFavorite, setMediaTrashed, setMediaVaulted, setSettings } from "@/lib/auth";
+import { checkLogin, countAdmins, countUsers, createSession, createUser, deleteMediaRow, destroySession, deleteUser, getMediaRow, getSettings, getSessionUser, getUserByUsername, getUserById, listEvents, logEvent, renameMedia, setMediaArchived, setMediaFavorite, setMediaTrashed, setMediaVaulted, setSettings } from "@/lib/auth";
 import { UPLOAD_DIR } from "@/lib/uploads";
 
 const usernamePattern = /^[a-z0-9_.-]{2,32}$/;
@@ -91,18 +91,17 @@ export async function deleteUserAction(formData) {
 export async function updateAdminSettingsAction(formData) {
 	const session = await getSessionUser();
 	if (!session?.isAdmin) redirect("/");
+	const appName = String(formData.get("appName") ?? "").trim().slice(0, 40);
 	const maintenance = formData.get("maintenance") === "on";
 	const sessionDays = Number(formData.get("sessionDays"));
 	const quotaGb = Number(formData.get("quotaGb"));
-	const usedGb = Number(formData.get("usedGb"));
 
 	const failPath = (message) => `/settings?error=${encodeURIComponent(message)}`;
+	if (!appName) redirect(failPath("Please enter an archive name."));
 	if (!Number.isInteger(sessionDays) || sessionDays < 1 || sessionDays > 365) redirect(failPath("Session lifetime must be between 1 and 365 days."));
 	if (!Number.isFinite(quotaGb) || quotaGb < 1) redirect(failPath("Storage quota must be at least 1 GB."));
-	if (!Number.isFinite(usedGb) || usedGb < 0) redirect(failPath("Storage used can't be negative."));
-	if (usedGb > quotaGb) redirect(failPath("Storage used can't exceed the quota."));
 
-	setSettings({ maintenance: maintenance ? "on" : "off", session_days: String(sessionDays), quota_gb: String(quotaGb), used_gb: String(usedGb) });
+	setSettings({ app_name: appName, maintenance: maintenance ? "on" : "off", session_days: String(sessionDays), quota_gb: String(quotaGb) });
 	logEvent("settings_updated", session.username, maintenance ? "Site settings updated (maintenance on)" : "Site settings updated");
 	redirect("/settings?saved=1");
 }
@@ -146,6 +145,16 @@ export async function moveToVaultAction(photoId) {
 	return { ok: true, vaulted: !row.vaulted };
 }
 
+export async function moveToArchiveAction(photoId) {
+	const user = await getSessionUser();
+	if (!user) return { ok: false, error: "Sign in first." };
+	const row = ownMedia(user, Number(photoId));
+	if (!row) return { ok: false, error: "Item not found." };
+	setMediaArchived(row.id, !row.archived);
+	logEvent(row.archived ? "media_unarchived" : "media_archived", user.username, row.archived ? `Removed "${row.title}" from the archive` : `Archived "${row.title}"`);
+	return { ok: true, archived: !row.archived };
+}
+
 export async function trashMediaAction(photoId) {
 	const user = await getSessionUser();
 	if (!user) return { ok: false, error: "Sign in first." };
@@ -153,7 +162,7 @@ export async function trashMediaAction(photoId) {
 	if (!row) return { ok: false, error: "Item not found." };
 	if (row.trashed) {
 		if (!row.url && row.filename) {
-			await unlink(path.join(UPLOAD_DIR, row.filename)).catch(() => {});
+			await unlink(path.join(UPLOAD_DIR, row.filename)).catch(() => { });
 		}
 		deleteMediaRow(row.id);
 		logEvent("media_deleted", user.username, `Permanently deleted "${row.title}"`);

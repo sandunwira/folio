@@ -20,7 +20,6 @@ async function Content({ searchParams }) {
 								<img src={album.cover} alt={album.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" loading="lazy" />
 							</div>
 							<p className="mt-2.5 truncate text-sm font-medium">{album.name}</p>
-							<p className="text-xs text-muted">{album.count} items</p>
 						</Link>
 					))}
 				</div>
