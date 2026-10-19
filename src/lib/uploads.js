@@ -1,13 +1,57 @@
-import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import exifr from "exifr";
+import sharp from "sharp";
 import { deleteMediaRow, getSettings, insertMediaRow, listAlbumMediaRows, listExpiredTrashRows, listMediaRows, setSettings } from "./db";
 import { estimateLocation } from "./geocode";
 import { SAMPLE_MEDIA } from "./media-data";
 import { formatBytes } from "./format";
 
 export const UPLOAD_DIR = path.join(process.cwd(), "data", "uploads");
+export const THUMB_DIR = path.join(process.cwd(), "data", "thumbs");
+
+const THUMB_SIZE = 512;
+const THUMB_MIME = "image/jpeg";
+const thumbJobs = new Map();
+const thumbFailures = new Set();
+
+export async function writeThumbnail(mediaId, buffer) {
+	try {
+		await mkdir(THUMB_DIR, { recursive: true });
+		await sharp(buffer).rotate().resize(THUMB_SIZE, THUMB_SIZE, { fit: "cover" }).jpeg({ quality: 82 }).toFile(path.join(THUMB_DIR, `${mediaId}.jpg`));
+		thumbFailures.delete(mediaId);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+export async function ensureThumbnail(row) {
+	if (row.url || row.mime.startsWith("image/") === false || thumbFailures.has(row.id)) return false;
+	const thumbPath = path.join(THUMB_DIR, `${row.id}.jpg`);
+	const existing = await stat(thumbPath).catch(() => null);
+	if (existing && existing.size > 0) return true;
+	if (!thumbJobs.has(row.id)) {
+		thumbJobs.set(
+			row.id,
+			(async () => {
+				let ok = false;
+				try {
+					const original = path.join(UPLOAD_DIR, row.filename);
+					ok = await writeThumbnail(row.id, await readFile(original));
+				} catch {
+					ok = false;
+				} finally {
+					thumbJobs.delete(row.id);
+					if (!ok) thumbFailures.add(row.id);
+				}
+				return ok;
+			})(),
+		);
+	}
+	return thumbJobs.get(row.id);
+}
 
 const VIEW_FILTERS = {
 	media: (row) => !row.trashed && !row.vaulted && !row.archived,
@@ -113,7 +157,7 @@ function mapMediaRow(row) {
 		estCity: row.est_city ?? "",
 		estCountry: row.est_country ?? "",
 		type: row.mime.startsWith("video/") ? "video" : "photo",
-		image: row.url || `/api/media/${row.id}`,
+		image: row.url || (row.mime.startsWith("image/") ? `/api/media/${row.id}/thumb` : `/api/media/${row.id}`),
 		large: row.url ? row.url.replace("w=800", "w=1600") : `/api/media/${row.id}`,
 		mime: row.mime,
 		size: formatBytes(row.size),
@@ -140,5 +184,5 @@ export async function saveUpload(file) {
 	await mkdir(UPLOAD_DIR, { recursive: true });
 	await writeFile(path.join(UPLOAD_DIR, storedName), buffer);
 	const meta = await extractUploadMeta(buffer, file.type);
-	return { storedName, size: file.size, ...meta };
+	return { storedName, size: file.size, buffer, ...meta };
 }

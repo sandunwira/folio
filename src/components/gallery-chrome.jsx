@@ -239,10 +239,12 @@ export default function GalleryChrome({ brand, storage }) {
 	return (
 		<>
 			<aside className={`fixed inset-y-0 left-0 z-50 flex w-75 max-w-[85vw] flex-col bg-panel px-3 py-4 shadow-2xl transition-transform duration-300 md:z-30 md:w-64 md:translate-x-0 md:shadow-none ${drawerOpen ? "translate-x-0" : "-translate-x-full"}`}>
-				<Link href="/" className="flex items-center gap-3 px-4 py-2 md:px-6 rounded-full font-medium text-ink hover:bg-black/5" onClick={() => setDrawerOpen(false)}>
-					<span className="md:hidden">
-						<Icon icon={IconMenu2} />
-					</span>
+				<button type="button" className="flex items-center gap-3 px-4 py-2 rounded-full font-medium text-ink hover:bg-black/5 md:hidden" onClick={() => setDrawerOpen(false)} aria-label="Close menu">
+					<Icon icon={IconMenu2} />
+					<img src="/icon.png" alt="Logo" width={24} height={24} className="text-[#1F5194]" />
+					<span className="truncate text-sm font-semibold tracking-tight text-ink">{brand}</span>
+				</button>
+				<Link href="/" className="hidden items-center gap-3 px-4 py-2 md:flex md:px-6 font-medium text-ink">
 					<img src="/icon.png" alt="Logo" width={24} height={24} className="text-[#1F5194]" />
 					<span className="truncate text-sm font-semibold tracking-tight text-ink">{brand}</span>
 				</Link>

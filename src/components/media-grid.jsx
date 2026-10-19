@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { addMediaToAlbumAction, createAlbumAction, moveToArchiveAction, moveToVaultAction, removeMediaFromAlbumAction, renameMediaAction, toggleMediaFavoriteAction, trashMediaAction } from "@/lib/actions";
-import { IconAperture, IconCamera, IconFocus2, IconSun, IconPlus } from "@tabler/icons-react";
+import { IconPlus } from "@tabler/icons-react";
 import {
 	IconAlbum,
 	IconCheck,
@@ -49,21 +49,19 @@ function buildInfoRows(photo, exifInfo) {
 	const height = exif ? (exif.ExifImageHeight ?? exif.ImageHeight) : null;
 	if (width && height) rows.push(["Resolution", `${width} × ${height}`]);
 	if (photo.size) rows.push(["Size", photo.size]);
-	const cameraChips = [];
 	const camera = exif ? [exif.Make, exif.Model].filter(Boolean).join(" ") : null;
-	if (camera) cameraChips.push({ icon: IconCamera, text: camera });
+	if (camera) rows.push(["Camera", camera]);
 	if (exif?.FocalLength != null) {
 		const focal = `${Number(exif.FocalLength).toFixed(1)} mm`;
 		const equiv = exif.FocalLengthIn35mmFormat != null ? ` (${Number(exif.FocalLengthIn35mmFormat).toFixed(0)} mm equiv.)` : "";
-		cameraChips.push({ icon: IconFocus2, text: `${focal}${equiv}` });
+		rows.push(["Focal length", `${focal}${equiv}`]);
 	}
-	if (exif?.FNumber != null) cameraChips.push({ icon: IconAperture, text: `f/${exif.FNumber}` });
-	if (exif?.ISO != null) cameraChips.push({ icon: IconSun, text: `ISO ${exif.ISO}` });
-	if (cameraChips.length > 0) rows.push(["Camera", cameraChips]);
+	if (exif?.FNumber != null) rows.push(["Aperture", `f/${exif.FNumber}`]);
+	if (exif?.ISO != null) rows.push(["ISO", String(exif.ISO)]);
 	return rows;
 }
 
-function MoreMenu({ open, setOpen, photo, onCopyLink, onVault, onArchive, onRenameSubmit }) {
+function MoreMenu({ open, setOpen, photo, onCopyLink, onVault, onArchive, onRenameSubmit, onFavorite, onDelete, onAddToAlbum, addable = false }) {
 	const menuRef = useRef(null);
 	const [renaming, setRenaming] = useState(false);
 
@@ -100,9 +98,13 @@ function MoreMenu({ open, setOpen, photo, onCopyLink, onVault, onArchive, onRena
 					) : (
 						<>
 							<button className={itemClass} onClick={() => setRenaming(true)}>Rename</button>
+							<button className={`${itemClass} md:hidden`} onClick={() => { setOpen(false); onFavorite(); }}>{photo.favorite ? "Remove from favorites" : "Add to favorites"}</button>
+							<a className={`${itemClass} md:hidden`} href={photo.large ?? photo.image} download target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>Download</a>
+							{addable && <button className={`${itemClass} md:hidden`} onClick={() => { setOpen(false); onAddToAlbum(); }}>Add to album</button>}
 							<button className={itemClass} onClick={onCopyLink}>Copy link</button>
 							<button className={itemClass} onClick={onArchive}>Move to archive</button>
 							<button className={itemClass} onClick={onVault}>Move to vault</button>
+							<button className={`${itemClass} md:hidden`} onClick={() => { setOpen(false); onDelete(); }}>Move to trash</button>
 						</>
 					)}
 				</div>
@@ -128,6 +130,8 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 	const [albumChoices, setAlbumChoices] = useState(null);
 	const [albumNameInput, setAlbumNameInput] = useState("");
 	const albumMenuRef = useRef(null);
+	const infoButtonRef = useRef(null);
+	const infoPanelRef = useRef(null);
 
 	const queryText = query.toLowerCase();
 	const visiblePhotos = query ? photos.filter((photo) => `${photo.title} ${photo.estLocation || photo.location}`.toLowerCase().includes(queryText)) : photos;
@@ -142,6 +146,7 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 	const selectedPhoto = searchParams.get("photo");
 	const viewerIndex = selectedPhoto ? visiblePhotos.findIndex((photo) => String(photo.id) === selectedPhoto) : -1;
 	const viewerPhoto = viewerIndex >= 0 ? visiblePhotos[viewerIndex] : null;
+	const viewerOpen = !!viewerPhoto;
 
 	const setViewerPhoto = (id, method = "push") => {
 		const params = new URLSearchParams(searchParams.toString());
@@ -217,6 +222,32 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 		};
 		loadExif();
 	}, [infoOpen, viewerPhoto?.id]);
+
+	useEffect(() => {
+		if (!infoOpen) return;
+		const onDown = (event) => {
+			if (infoPanelRef.current?.contains(event.target) || infoButtonRef.current?.contains(event.target)) return;
+			setInfoOpen(false);
+		};
+		const onKeyDown = (event) => {
+			if (event.key === "Escape") setInfoOpen(false);
+		};
+		document.addEventListener("mousedown", onDown);
+		document.addEventListener("keydown", onKeyDown);
+		return () => {
+			document.removeEventListener("mousedown", onDown);
+			document.removeEventListener("keydown", onKeyDown);
+		};
+	}, [infoOpen]);
+
+	useEffect(() => {
+		if (!viewerOpen) return;
+		const previous = document.body.style.overflow;
+		document.body.style.overflow = "hidden";
+		return () => {
+			document.body.style.overflow = previous;
+		};
+	}, [viewerOpen]);
 
 	const toggleSelect = (id) => {
 		const next = new Set(selection);
@@ -445,7 +476,7 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 										</button>
 									)}
 									{cardMenuFor === photo.id && (
-										<div ref={albumMenuRef} className="absolute bottom-11 right-2 z-10 w-56 rounded-xl border border-white/15 bg-zinc-900 p-1 text-xs text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+										<div ref={albumMenuRef} className="absolute bottom-11 right-2 z-30 w-56 rounded-xl border border-white/15 bg-zinc-900 p-1 text-xs text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
 											{removableAlbumId ? (
 												<>
 													<p className="px-2.5 pb-1.5 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-white/40">Album actions</p>
@@ -481,15 +512,15 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 							<p className="text-sm font-medium">{viewerPhoto.title}</p>
 						</div>
 						<div className="flex items-center gap-1">
-							<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" onClick={() => favoritePhoto(viewerPhoto)} aria-label={viewerPhoto.favorite ? "Remove from favorites" : "Add to favorites"}>
+							<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 max-md:hidden" onClick={() => favoritePhoto(viewerPhoto)} aria-label={viewerPhoto.favorite ? "Remove from favorites" : "Add to favorites"}>
 								<Icon icon={viewerPhoto.favorite ? IconHeartFilled : IconHeart} />
 							</button>
-							<a className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" href={viewerPhoto.image} download target="_blank" rel="noreferrer" aria-label="Download">
+							<a className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 max-md:hidden" href={viewerPhoto.large ?? viewerPhoto.image} download target="_blank" rel="noreferrer" aria-label="Download">
 								<Icon icon={IconDownload} />
 							</a>
 							{addable && (
 								<div className="relative">
-									<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" onClick={toggleViewerAlbumMenu} aria-label="Add to album" aria-expanded={addToAlbumOpen}>
+									<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 max-md:hidden" onClick={toggleViewerAlbumMenu} aria-label="Add to album" aria-expanded={addToAlbumOpen}>
 										<Icon icon={IconFolderPlus} />
 									</button>
 									{addToAlbumOpen && (
@@ -499,13 +530,13 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 									)}
 								</div>
 							)}
-							<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" onClick={() => setInfoOpen((value) => !value)} aria-label="Info" aria-pressed={infoOpen}>
+							<button ref={infoButtonRef} className={`grid h-10 w-10 place-items-center rounded-full transition hover:bg-white/10 ${infoOpen ? "bg-white/20" : ""}`} onClick={() => setInfoOpen((value) => !value)} aria-label="Info" aria-pressed={infoOpen}>
 								<Icon icon={IconInfoCircle} />
 							</button>
-							<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" onClick={() => deletePhoto(viewerPhoto)} aria-label="Delete">
+							<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 max-md:hidden" onClick={() => deletePhoto(viewerPhoto)} aria-label="Delete">
 								<Icon icon={IconTrash} />
 							</button>
-							<MoreMenu key={viewerPhoto.id} open={moreOpen} setOpen={setMoreOpen} photo={viewerPhoto} onCopyLink={copyViewerLink} onVault={() => vaultPhoto(viewerPhoto)} onArchive={() => archivePhoto(viewerPhoto)} onRenameSubmit={submitRename} />
+							<MoreMenu key={viewerPhoto.id} open={moreOpen} setOpen={setMoreOpen} photo={viewerPhoto} onCopyLink={copyViewerLink} onVault={() => vaultPhoto(viewerPhoto)} onArchive={() => archivePhoto(viewerPhoto)} onRenameSubmit={submitRename} onFavorite={() => favoritePhoto(viewerPhoto)} onDelete={() => deletePhoto(viewerPhoto)} onAddToAlbum={toggleViewerAlbumMenu} addable={addable} />
 						</div>
 					</div>
 					<div className="flex flex-1 items-center overflow-hidden px-2 md:px-12" onClick={(event) => event.stopPropagation()}>
@@ -522,22 +553,12 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 						)}
 					</div>
 					{infoOpen && (
-						<div className="absolute bottom-24 left-1/2 z-10 max-h-[40vh] w-[80vw] md:w-[50vw] max-w-[86vw] -translate-x-1/2 overflow-y-auto rounded-xl bg-zinc-800 p-4 text-sm text-white drop-shadow-2xl drop-shadow-black" onClick={(event) => event.stopPropagation()}>
-							<div className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-xs">
+						<div ref={infoPanelRef} className="absolute top-16 right-8 z-10 max-h-[80vh] w-60 md:w-60 max-w-60 overflow-y-auto rounded-xl bg-zinc-800 p-4 text-sm text-white drop-shadow-2xl drop-shadow-black" onClick={(event) => event.stopPropagation()}>
+							<div className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-xs">
 								{infoRows.map(([label, value]) => (
 									<div key={label} className="col-span-2 grid grid-cols-subgrid">
 										<span className="shrink-0 text-white/60">{label}</span>
-										{Array.isArray(value) ? (
-											<span className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-right">
-												{value.map((item) => (
-													<span key={item.text} className="inline-flex items-center gap-1">
-														<Icon icon={item.icon} size={13} /> {item.text}
-													</span>
-												))}
-											</span>
-										) : (
-											<span className="break-all text-right">{value}</span>
-										)}
+										<span className="break-all text-right">{value}</span>
 									</div>
 								))}
 							</div>

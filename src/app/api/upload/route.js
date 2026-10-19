@@ -1,6 +1,6 @@
 import path from "node:path";
 import { getSettings, getSessionUser, insertMediaRow, logEvent, sumMediaBytes } from "@/lib/auth";
-import { saveUpload } from "@/lib/uploads";
+import { saveUpload, writeThumbnail } from "@/lib/uploads";
 
 export async function POST(request) {
 	const user = await getSessionUser();
@@ -26,7 +26,7 @@ export async function POST(request) {
 		const saved = await saveUpload(file);
 		const title = path.parse(file.name).name.slice(0, 120) || "Untitled";
 		const lastModified = Number(form.get("lastModified"));
-		insertMediaRow({
+		const inserted = insertMediaRow({
 			userId: user.id,
 			title,
 			filename: saved.storedName,
@@ -36,6 +36,7 @@ export async function POST(request) {
 			est: saved.est ?? null,
 			createdAt: saved.createdAt ?? (Number.isFinite(lastModified) ? lastModified : Date.now()),
 		});
+		if (file.type.startsWith("image/")) await writeThumbnail(inserted.id, saved.buffer);
 		uploaded += 1;
 	}
 

@@ -24,7 +24,7 @@ async function Content({ searchParams }) {
 						<div key={album.id} className="group relative">
 							<Link href={`/albums/${album.id}`} className="block">
 								<div className="relative aspect-square overflow-hidden rounded-xl bg-[#ececec]">
-									{album.cover_media_id ? <img src={`/api/media/${album.cover_media_id}`} alt={album.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" loading="lazy" /> : (
+									{album.cover_media_id ? <img src={`/api/media/${album.cover_media_id}/thumb`} alt={album.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" loading="lazy" /> : (
 										<div className="grid h-full w-full place-items-center text-muted">
 											<IconAlbum size={28} stroke={1.5} aria-hidden="true" />
 										</div>
