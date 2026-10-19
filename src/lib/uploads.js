@@ -116,6 +116,8 @@ export async function listUserMedia(userId, view = "media") {
 				time,
 				location: row.location ?? "",
 				estLocation: row.est_location ?? "",
+				estCity: row.est_city ?? "",
+				estCountry: row.est_country ?? "",
 				type: row.mime.startsWith("video/") ? "video" : "photo",
 				image: row.url || `/api/media/${row.id}`,
 				large: row.url ? row.url.replace("w=800", "w=1600") : `/api/media/${row.id}`,

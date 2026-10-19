@@ -317,7 +317,7 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 									</span>
 									{(photo.estLocation || photo.location) && (
 										<span className="pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/50 to-transparent p-2 pt-6 text-left opacity-100 transition group-hover:opacity-100">
-											<span className="line-clamp-1 text-[11px] text-white">{photo.estLocation || photo.location}</span>
+											<span className="line-clamp-1 text-[11px] text-white">{[photo.estCity, photo.estCountry].filter(Boolean).join(", ")}</span>
 										</span>
 									)}
 									<span className="pointer-events-none absolute inset-0 hidden rounded-lg group-hover:block group-hover:bg-black/10" />
@@ -401,9 +401,9 @@ export default function MediaGrid({ photos, query = "", emptyState = {} }) {
 							<strong>{viewerPhoto.date}</strong>
 							<p className="text-xs text-white/60">{viewerPhoto.time}</p>
 						</div>
-						{(viewerPhoto.estLocation || viewerPhoto.location) && (
+						{(viewerPhoto.estCity || viewerPhoto.estLocation) && (
 							<div className="flex items-center gap-2 text-xs text-white/80">
-								<Icon icon={IconLocation} size={14} /> {viewerPhoto.estLocation || viewerPhoto.location}
+								<Icon icon={IconLocation} size={14} /> {[viewerPhoto.estCity, viewerPhoto.estCountry].filter(Boolean).join(", ")}
 							</div>
 						)}
 					</div>
