@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { IconShieldLock } from "@tabler/icons-react";
 import { getSessionUser, listUsers } from "@/lib/auth";
-import { createUserAction, deleteUserAction, toggleUserActiveAction } from "@/lib/actions";
+import { createUserAction, deleteUserAction, resetUserPasswordAction, toggleUserActiveAction } from "@/lib/actions";
 import UserActions from "@/components/user-actions";
 
 function Avatar({ name }) {
@@ -69,6 +69,11 @@ async function Content({ searchParams }) {
 												<IconShieldLock size={10} /> Admin
 											</span>
 										)}
+										{account.active === 0 ? (
+											<span className="rounded-full bg-[#fbeaea] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#c5221f]">Deactivated</span>
+										) : (
+											<span className="rounded-full bg-[#e6f4ea] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#1e7e34]">Active</span>
+										)}
 									</p>
 									<p className="truncate text-xs text-muted">@{account.username}</p>
 								</div>
@@ -79,6 +84,7 @@ async function Content({ searchParams }) {
 										account={{ id: account.id, username: account.username, display_name: account.display_name, is_admin: account.is_admin, active: account.active ?? 1, isSelf, isLastAdmin }}
 										onDelete={deleteUserAction}
 										onToggle={toggleUserActiveAction}
+										onResetPassword={resetUserPasswordAction}
 									/>
 								)}
 							</li>

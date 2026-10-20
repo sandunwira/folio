@@ -188,6 +188,10 @@ export function setUserActive(id, active) {
 	db.prepare("UPDATE users SET active = ? WHERE id = ?").run(active ? 1 : 0, id);
 }
 
+export function setUserPasswordRow(id, passwordHash) {
+	db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(passwordHash, id);
+}
+
 export function deleteSessionsByUserId(userId) {
 	db.prepare("DELETE FROM sessions WHERE user_id = ?").run(userId);
 }

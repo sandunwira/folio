@@ -20,6 +20,7 @@ const eventLabels = {
 	admin_bootstrapped: "Admin bootstrapped",
 	account_created: "Account created",
 	account_deleted: "Account deleted",
+	password_reset: "Password reset",
 	settings_updated: "Settings updated",
 	media_uploaded: "Media uploaded",
 	media_upload_skipped: "Upload skipped",

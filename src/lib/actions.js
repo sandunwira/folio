@@ -99,6 +99,21 @@ export async function toggleUserActiveAction(formData) {
 	return { ok: true, active: activating };
 }
 
+export async function resetUserPasswordAction(formData) {
+	const session = await getSessionUser();
+	if (!session?.isAdmin) redirect("/");
+	const id = Number(formData.get("id"));
+	const newPassword = String(formData.get("newPassword") ?? "");
+	const target = id ? getUserById(id) : null;
+	if (!target) return { ok: false, error: "Account not found." };
+	if (newPassword.length < 6) return { ok: false, error: "New password must be at least 6 characters." };
+	setUserPasswordRow(target.id, hashPassword(newPassword));
+	if (target.id !== session.id) deleteSessionsByUserId(target.id);
+	revalidatePath("/dashboard/users");
+	logEvent("password_reset", session.username, `Reset the password for "${target.username}"${target.id === session.id ? "" : " — their sessions were signed out"}`);
+	return { ok: true };
+}
+
 export async function deleteUserAction(formData) {
 	const session = await getSessionUser();
 	if (!session?.isAdmin) redirect("/");

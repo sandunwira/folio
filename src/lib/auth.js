@@ -16,6 +16,8 @@ export {
 	getUserById,
 	setUserActive,
 	deleteSessionsByUserId,
+	setUserPasswordRow,
+	hashPassword,
 	getSettings,
 	setSettings,
 	logEvent,
