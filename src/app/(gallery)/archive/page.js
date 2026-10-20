@@ -27,7 +27,7 @@ async function Content({ searchParams }) {
 				photos={photos}
 				query={q ?? ""}
 				archiveOnly
-				emptyState={{ iconKey: "photo", title: "No archived items", text: "Move photos here to tuck them away without deleting them." }}
+				emptyState={{ iconKey: "archive", title: "No archived items", text: "Move photos here to tuck them away without deleting them." }}
 			/>
 		</section>
 	);

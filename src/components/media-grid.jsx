@@ -124,7 +124,7 @@ function MoreMenu({ open, setOpen, photo, onCopyLink, onVault, onArchive, onRena
 	);
 }
 
-const emptyIcons = { photo: IconPhoto, search: IconSearch, lock: IconLock, trash: IconTrash, wand: IconWand };
+const emptyIcons = { photo: IconPhoto, search: IconSearch, lock: IconLock, trash: IconTrash, wand: IconWand, archive: IconArchive };
 
 export default function MediaGrid({ photos, query = "", emptyState = {}, addable = false, removableAlbumId = null, restore = false, archiveOnly = false }) {
 	const router = useRouter();
