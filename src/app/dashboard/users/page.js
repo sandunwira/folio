@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { IconShieldLock } from "@tabler/icons-react";
 import { getSessionUser, listUsers } from "@/lib/auth";
-import { createUserAction, deleteUserAction } from "@/lib/actions";
+import { createUserAction, deleteUserAction, toggleUserActiveAction } from "@/lib/actions";
+import UserActions from "@/components/user-actions";
 
 function Avatar({ name }) {
 	return <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-ink text-xs font-medium text-white">{(name?.[0] ?? "?").toUpperCase()}</span>;
@@ -74,12 +75,11 @@ async function Content({ searchParams }) {
 								{isSelf ? (
 									<span className="text-xs text-faint">You</span>
 								) : (
-									<form action={deleteUserAction}>
-										<input type="hidden" name="id" value={account.id} />
-										<button className="h-9 rounded-full border border-line bg-panel px-4 text-xs font-medium text-ink transition hover:bg-black/5 disabled:cursor-not-allowed disabled:text-faint" disabled={isLastAdmin} title={isLastAdmin ? "Cannot delete the last admin" : undefined}>
-											Delete
-										</button>
-									</form>
+									<UserActions
+										account={{ id: account.id, username: account.username, display_name: account.display_name, is_admin: account.is_admin, active: account.active ?? 1, isSelf, isLastAdmin }}
+										onDelete={deleteUserAction}
+										onToggle={toggleUserActiveAction}
+									/>
 								)}
 							</li>
 						);

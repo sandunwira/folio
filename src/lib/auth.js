@@ -11,8 +11,11 @@ export {
 	createUser,
 	deleteUser,
 	countAdmins,
+	countActiveAdmins,
 	getUserByUsername,
 	getUserById,
+	setUserActive,
+	deleteSessionsByUserId,
 	getSettings,
 	setSettings,
 	logEvent,
@@ -73,7 +76,11 @@ export async function getSessionUser() {
 		deleteSessionByToken(token);
 		return null;
 	}
-	return { id: row.id, username: row.username, name: row.display_name, isAdmin: row.is_admin === 1, createdAt: row.created_at };
+	if (row.active === 0) {
+		deleteSessionByToken(token);
+		return null;
+	}
+	return { id: row.id, username: row.username, name: row.display_name, isAdmin: row.is_admin === 1, active: row.active !== 0, createdAt: row.created_at };
 }
 
 export async function destroySession() {

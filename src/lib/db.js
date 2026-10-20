@@ -67,6 +67,7 @@ function connectDatabase() {
 
 		for (const statement of [
 			"ALTER TABLE media ADD COLUMN url TEXT",
+			"ALTER TABLE users ADD COLUMN active INTEGER NOT NULL DEFAULT 1",
 			"ALTER TABLE media ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0",
 			"ALTER TABLE media ADD COLUMN archived INTEGER NOT NULL DEFAULT 0",
 			"ALTER TABLE media ADD COLUMN vaulted INTEGER NOT NULL DEFAULT 0",
@@ -111,6 +112,12 @@ function connectDatabase() {
 			db.prepare("INSERT INTO cron_jobs (name, job_type, interval_minutes, active, last_run, created_at) VALUES (?, ?, ?, 1, 0, ?)").run(job.name, job.jobType, job.intervalMinutes, Date.now());
 		}
 	}
+
+	try {
+		db.exec("ALTER TABLE users ADD COLUMN active INTEGER NOT NULL DEFAULT 1");
+	} catch (error) {
+		if (!String(error).includes("duplicate column")) throw error;
+	}
 }
 
 connectDatabase();
@@ -153,11 +160,11 @@ export function getUserById(id) {
 }
 
 export function listUsers() {
-	return db.prepare("SELECT id, username, display_name, is_admin, created_at FROM users ORDER BY is_admin DESC, created_at ASC").all();
+	return db.prepare("SELECT id, username, display_name, is_admin, active, created_at FROM users ORDER BY is_admin DESC, created_at ASC").all();
 }
 
 export function recentUsers(limit) {
-	return db.prepare("SELECT id, username, display_name, is_admin, created_at FROM users ORDER BY created_at DESC LIMIT ?").all(limit);
+	return db.prepare("SELECT id, username, display_name, is_admin, active, created_at FROM users ORDER BY created_at DESC LIMIT ?").all(limit);
 }
 
 export function countActiveSessions() {
@@ -173,6 +180,18 @@ export function deleteUser(id) {
 	db.prepare("DELETE FROM users WHERE id = ?").run(id);
 }
 
+export function countActiveAdmins() {
+	return db.prepare("SELECT COUNT(*) AS c FROM users WHERE is_admin = 1 AND active = 1").get().c;
+}
+
+export function setUserActive(id, active) {
+	db.prepare("UPDATE users SET active = ? WHERE id = ?").run(active ? 1 : 0, id);
+}
+
+export function deleteSessionsByUserId(userId) {
+	db.prepare("DELETE FROM sessions WHERE user_id = ?").run(userId);
+}
+
 export function countAdmins() {
 	return db.prepare("SELECT COUNT(*) AS c FROM users WHERE is_admin = 1").get().c;
 }
@@ -183,7 +202,7 @@ export function createSessionRow(token, userId, expiresAt) {
 
 export function getSessionByToken(token) {
 	return db.prepare(`
-		SELECT u.id, u.username, u.display_name, u.is_admin, u.created_at, s.token, s.expires_at
+		SELECT u.id, u.username, u.display_name, u.is_admin, u.active, u.created_at, s.token, s.expires_at
 		FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?
 	`).get(token);
 }

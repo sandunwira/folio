@@ -4,7 +4,7 @@ import { unlink } from "node:fs/promises";
 import path from "node:path";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { checkLogin, countAdmins, countUsers, createAlbum, createSession, createUser, deleteAlbumRow, deleteMediaRow, destroySession, deleteUser, getAlbum, getMediaRow, getSettings, getSessionUser, getUserByUsername, getUserById, listEvents, listMediaRows, logEvent, renameAlbum, renameMedia, addAlbumMedia, removeAlbumMedia, setMediaArchived, setMediaFavorite, setMediaTrashed, setMediaVaulted, setSettings } from "@/lib/auth";
+import { checkLogin, countActiveAdmins, countAdmins, countUsers, createAlbum, createSession, createUser, deleteAlbumRow, deleteMediaRow, deleteSessionsByUserId, destroySession, deleteUser, getAlbum, getMediaRow, getSettings, getSessionUser, getUserByUsername, getUserById, listEvents, listMediaRows, logEvent, renameAlbum, renameMedia, addAlbumMedia, removeAlbumMedia, setMediaArchived, setMediaFavorite, setMediaTrashed, setMediaVaulted, setSettings, setUserActive } from "@/lib/auth";
 import { UPLOAD_DIR } from "@/lib/uploads";
 import { syncArchiveZip } from "@/lib/archive";
 import { BACKUP_DIR, EXPORT_DIR, CRON_JOB_TYPES, createSnapshot, deleteFile, executeJobType, exportConfigFile, importConfig } from "@/lib/cron";
@@ -43,6 +43,10 @@ export async function loginAction(formData) {
 		logEvent("login_failed", username, "Failed sign-in attempt");
 		redirect(loginErrorPath("Incorrect username or password."));
 	}
+	if (user.active === 0) {
+		logEvent("login_failed", username, "Sign-in attempt on a deactivated account");
+		redirect(loginErrorPath("This account has been deactivated. Contact the admin to activate your account."));
+	}
 	logEvent("login_success", username, "Signed in");
 	await createSession(user.id, sessionLifetimeDays());
 	redirect("/");
@@ -79,17 +83,34 @@ export async function createUserAction(formData) {
 	redirect("/dashboard/users");
 }
 
+export async function toggleUserActiveAction(formData) {
+	const session = await getSessionUser();
+	if (!session?.isAdmin) redirect("/");
+	const id = Number(formData.get("id"));
+	const target = id ? getUserById(id) : null;
+	if (!target) return { ok: false, error: "Account not found." };
+	const activating = target.active !== 1;
+	if (!activating && target.id === session.id) return { ok: false, error: "You cannot deactivate your own account." };
+	if (!activating && target.is_admin && countActiveAdmins() <= 1) return { ok: false, error: "Cannot deactivate the last active admin." };
+	setUserActive(target.id, activating ? 1 : 0);
+	if (!activating) deleteSessionsByUserId(target.id);
+	revalidatePath("/dashboard/users");
+	logEvent(activating ? "account_activated" : "account_deactivated", session.username, `${activating ? "Activated" : "Deactivated"} account "${target.username}"`);
+	return { ok: true, active: activating };
+}
+
 export async function deleteUserAction(formData) {
 	const session = await getSessionUser();
 	if (!session?.isAdmin) redirect("/");
 	const id = Number(formData.get("id"));
 	const target = id ? getUserById(id) : null;
-	if (!target || target.id === session.id) redirect("/dashboard/users");
-	if (target.is_admin && countAdmins() <= 1) redirect("/dashboard/users");
+	if (!target || target.id === session.id) return { ok: false, error: "You cannot delete your own account." };
+	if (target.is_admin && countAdmins() <= 1) return { ok: false, error: "Cannot delete the last admin." };
 	const deletedUsername = target.username;
 	deleteUser(target.id);
 	logEvent("account_deleted", session.username, `Deleted account "${deletedUsername}"`);
-	redirect("/dashboard/users");
+	revalidatePath("/dashboard/users");
+	return { ok: true };
 }
 
 export async function updateAdminSettingsAction(formData) {
