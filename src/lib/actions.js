@@ -3,7 +3,7 @@
 import { unlink } from "node:fs/promises";
 import path from "node:path";
 import { redirect } from "next/navigation";
-import { checkLogin, countAdmins, countUsers, createAlbum, createSession, createUser, deleteAlbumRow, deleteMediaRow, destroySession, deleteUser, getAlbum, getMediaRow, getSettings, getSessionUser, getUserByUsername, getUserById, listEvents, logEvent, renameAlbum, renameMedia, addAlbumMedia, removeAlbumMedia, setMediaArchived, setMediaFavorite, setMediaTrashed, setMediaVaulted, setSettings } from "@/lib/auth";
+import { checkLogin, countAdmins, countUsers, createAlbum, createSession, createUser, deleteAlbumRow, deleteMediaRow, destroySession, deleteUser, getAlbum, getMediaRow, getSettings, getSessionUser, getUserByUsername, getUserById, listEvents, listMediaRows, logEvent, renameAlbum, renameMedia, addAlbumMedia, removeAlbumMedia, setMediaArchived, setMediaFavorite, setMediaTrashed, setMediaVaulted, setSettings } from "@/lib/auth";
 import { UPLOAD_DIR } from "@/lib/uploads";
 import { syncArchiveZip } from "@/lib/archive";
 
@@ -156,6 +156,57 @@ export async function moveToArchiveAction(photoId) {
 	logEvent(row.archived ? "media_unarchived" : "media_archived", user.username, row.archived ? `Removed "${row.title}" from the archive` : `Archived "${row.title}"`);
 	await syncArchiveZip(row.user_id);
 	return { ok: true, archived: !row.archived };
+}
+
+function ownRows(user, ids) {
+	const wanted = new Set((Array.isArray(ids) ? ids : []).map(Number).filter((id) => Number.isInteger(id)).slice(0, 500).map(String));
+	return listMediaRows(user.id).filter((row) => wanted.has(String(row.id)));
+}
+
+export async function bulkFavoriteAction(ids) {
+	const user = await getSessionUser();
+	if (!user) return { ok: false, error: "Sign in first." };
+	const rows = ownRows(user, ids);
+	if (!rows.length) return { ok: false, error: "No items in your selection." };
+	const favorite = rows.every((row) => row.favorite) ? 0 : 1;
+	for (const row of rows) setMediaFavorite(row.id, favorite);
+	logEvent(favorite ? "media_favorited" : "media_unfavorited", user.username, favorite ? `Added ${rows.length} item${rows.length === 1 ? "" : "s"} to favorites` : `Removed ${rows.length} item${rows.length === 1 ? "" : "s"} from favorites`);
+	return { ok: true, favorite: !!favorite, count: rows.length };
+}
+
+export async function bulkArchiveAction(ids) {
+	const user = await getSessionUser();
+	if (!user) return { ok: false, error: "Sign in first." };
+	const rows = ownRows(user, ids);
+	if (!rows.length) return { ok: false, error: "No items in your selection." };
+	const archived = rows.every((row) => row.archived) ? 0 : 1;
+	for (const row of rows) setMediaArchived(row.id, archived);
+	for (const userId of new Set(rows.map((row) => row.user_id))) await syncArchiveZip(userId);
+	logEvent(archived ? "media_archived" : "media_unarchived", user.username, archived ? `Archived ${rows.length} item${rows.length === 1 ? "" : "s"}` : `Removed ${rows.length} item${rows.length === 1 ? "" : "s"} from the archive`);
+	return { ok: true, archived: !!archived, count: rows.length };
+}
+
+export async function bulkTrashAction(ids) {
+	const user = await getSessionUser();
+	if (!user) return { ok: false, error: "Sign in first." };
+	const rows = ownRows(user, ids);
+	if (!rows.length) return { ok: false, error: "No items in your selection." };
+	for (const row of rows) setMediaTrashed(row.id, 1);
+	for (const userId of new Set(rows.filter((row) => row.archived).map((row) => row.user_id))) await syncArchiveZip(userId);
+	logEvent("media_trashed", user.username, `Moved ${rows.length} item${rows.length === 1 ? "" : "s"} to Trash`);
+	return { ok: true, count: rows.length };
+}
+
+export async function bulkAddToAlbumAction(albumId, ids) {
+	const user = await getSessionUser();
+	if (!user) return { ok: false, error: "Sign in first." };
+	const album = getAlbum(user.id, Number(albumId));
+	if (!album) return { ok: false, error: "Album not found." };
+	const rows = ownRows(user, ids);
+	if (!rows.length) return { ok: false, error: "No items in your selection." };
+	for (const row of rows) addAlbumMedia(album.id, row.id);
+	logEvent("media_added_to_album", user.username, `Added ${rows.length} item${rows.length === 1 ? "" : "s"} to "${album.name}"`);
+	return { ok: true, count: rows.length };
 }
 
 export async function createAlbumAction(formData) {

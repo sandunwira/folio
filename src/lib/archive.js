@@ -10,7 +10,7 @@ function archiveItems(userId) {
 	return listMediaRows(userId).filter((row) => row.archived && !row.trashed && !row.vaulted && !row.url);
 }
 
-function entryName(item, used) {
+export function entryName(item, used) {
 	const ext = path.extname(item.filename) || "";
 	let name = `${item.title}${ext}`;
 	if (used.has(name.toLowerCase())) {

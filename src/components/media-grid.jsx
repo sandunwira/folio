@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { addMediaToAlbumAction, createAlbumAction, moveToArchiveAction, moveToVaultAction, removeMediaFromAlbumAction, renameMediaAction, toggleMediaFavoriteAction, trashMediaAction } from "@/lib/actions";
+import { addMediaToAlbumAction, bulkAddToAlbumAction, bulkArchiveAction, bulkFavoriteAction, bulkTrashAction, createAlbumAction, moveToArchiveAction, moveToVaultAction, removeMediaFromAlbumAction, renameMediaAction, toggleMediaFavoriteAction, trashMediaAction } from "@/lib/actions";
 import { IconPlus } from "@tabler/icons-react";
 import {
 	IconAlbum,
+	IconArchive,
 	IconCheck,
 	IconChevronDown,
 	IconChevronLeft,
@@ -127,6 +128,8 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 	const exifFetchRef = useRef({});
 	const [toast, setToast] = useState(null);
 	const [cardMenuFor, setCardMenuFor] = useState(null);
+	const [confirmTrashOpen, setConfirmTrashOpen] = useState(false);
+	const [bulkAlbumOpen, setBulkAlbumOpen] = useState(false);
 	const [addToAlbumOpen, setAddToAlbumOpen] = useState(false);
 	const [albumChoices, setAlbumChoices] = useState(null);
 	const [albumNameInput, setAlbumNameInput] = useState("");
@@ -161,6 +164,10 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 		if (viewerIndex < 0 && !addToAlbumOpen && !cardMenuFor) return;
 		const onKey = (event) => {
 			if (event.key === "Escape") {
+				if (bulkAlbumOpen) {
+					setBulkAlbumOpen(false);
+					return;
+				}
 				if (addToAlbumOpen) {
 					setAddToAlbumOpen(false);
 					return;
@@ -178,19 +185,21 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [viewerIndex, visiblePhotos, moreOpen, addToAlbumOpen, cardMenuFor]);
+	}, [viewerIndex, visiblePhotos, moreOpen, addToAlbumOpen, bulkAlbumOpen, cardMenuFor]);
 
 	useEffect(() => {
-		if (!cardMenuFor && !addToAlbumOpen) return;
+		if (!cardMenuFor && !bulkAlbumOpen && !addToAlbumOpen) return;
 		const onPointerDown = (event) => {
 			if (albumMenuRef.current && !albumMenuRef.current.contains(event.target)) {
 				setCardMenuFor(null);
+				setBulkAlbumOpen(false);
 				setAddToAlbumOpen(false);
 			}
 		};
 		const onKeyDown = (event) => {
 			if (event.key === "Escape") {
 				setCardMenuFor(null);
+				setBulkAlbumOpen(false);
 				setAddToAlbumOpen(false);
 			}
 		};
@@ -200,7 +209,16 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 			document.removeEventListener("mousedown", onPointerDown);
 			document.removeEventListener("keydown", onKeyDown);
 		};
-	}, [cardMenuFor, addToAlbumOpen]);
+	}, [cardMenuFor, bulkAlbumOpen, addToAlbumOpen]);
+
+	useEffect(() => {
+		if (!confirmTrashOpen) return;
+		const onKeyDown = (event) => {
+			if (event.key === "Escape") setConfirmTrashOpen(false);
+		};
+		document.addEventListener("keydown", onKeyDown);
+		return () => document.removeEventListener("keydown", onKeyDown);
+	}, [confirmTrashOpen]);
 
 	useEffect(() => {
 		if (!toast) return;
@@ -327,6 +345,7 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 
 	const toggleViewerAlbumMenu = () => {
 		setCardMenuFor(null);
+		setBulkAlbumOpen(false);
 		if (addToAlbumOpen) {
 			setAddToAlbumOpen(false);
 			return;
@@ -335,8 +354,19 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 		loadAlbumChoices();
 	};
 
-	const addPhotoToAlbum = async (album, photo) => {
-		const result = await addMediaToAlbumAction(album.id, photo.id);
+	const toggleBulkAlbumMenu = () => {
+		setCardMenuFor(null);
+		setAddToAlbumOpen(false);
+		if (bulkAlbumOpen) {
+			setBulkAlbumOpen(false);
+			return;
+		}
+		setBulkAlbumOpen(true);
+		loadAlbumChoices();
+	};
+
+	const addPhotoToAlbum = async (album, photoId) => {
+		const result = await addMediaToAlbumAction(album.id, photoId);
 		flashToast(result, `Added to "${album.name}".`);
 		setCardMenuFor(null);
 		setAddToAlbumOpen(false);
@@ -365,7 +395,7 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 		}
 	};
 
-	const renderAlbumMenuItems = (photo) => (
+	const renderAlbumMenuItems = (onPick) => (
 		<>
 			<p className="px-2.5 pb-1.5 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-white/40">Add to album</p>
 			<div className="max-h-44 overflow-y-auto">
@@ -375,7 +405,7 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 					<p className="px-2.5 py-1.5 text-white/60">No albums yet, create one below.</p>
 				) : (
 					albumChoices.map((album) => (
-						<button key={album.id} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition hover:bg-white/10" onClick={() => addPhotoToAlbum(album, photo)}>
+						<button key={album.id} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition hover:bg-white/10" onClick={() => onPick(album)}>
 							<Icon icon={IconAlbum} size={15} />
 							<span className="min-w-0 flex-1 truncate">{album.name}</span>
 							<span className="text-white/40">{album.count}</span>
@@ -409,21 +439,50 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 		router.refresh();
 	};
 
+	const plural = (count) => `item${count === 1 ? "" : "s"}`;
+
 	const favoriteSelection = async () => {
 		const ids = [...selection];
-		const results = await Promise.all(ids.map((id) => toggleMediaFavoriteAction(id)));
-		if (results.some((res) => res?.error)) setToast({ kind: "error", text: results.find((res) => res?.error).error });
-		else setToast({ kind: "ok", text: `Favorites updated for ${ids.length} item${ids.length === 1 ? "" : "s"}.` });
+		const result = await bulkFavoriteAction(ids);
+		flashToast(result, (res) => (res.favorite ? `Added ${plural(res.count)} to favorites.` : `Removed ${plural(res.count)} from favorites.`));
 		setSelection(new Set());
 		router.refresh();
 	};
 
-	const trashSelection = async () => {
+	const archiveSelection = async () => {
 		const ids = [...selection];
-		const results = await Promise.all(ids.map((id) => trashMediaAction(id)));
-		const failure = results.find((res) => res?.error);
-		if (failure) setToast({ kind: "error", text: failure.error });
-		else setToast({ kind: "ok", text: `Moved ${ids.length} item${ids.length === 1 ? "" : "s"} to Trash.` });
+		const result = await bulkArchiveAction(ids);
+		flashToast(result, (res) => (res.archived ? `Moved ${plural(res.count)} to Archive.` : `Removed ${plural(res.count)} from Archive.`));
+		setSelection(new Set());
+		router.refresh();
+	};
+
+	const trashSelection = () => setConfirmTrashOpen(true);
+
+	const confirmTrash = async () => {
+		const ids = [...selection];
+		setConfirmTrashOpen(false);
+		const result = await bulkTrashAction(ids);
+		flashToast(result, (res) => `Moved ${plural(res.count)} to Trash.`);
+		setSelection(new Set());
+		router.refresh();
+	};
+
+	const downloadSelection = () => {
+		if (selection.size === 0) return;
+		const anchor = document.createElement("a");
+		anchor.href = `/api/download?ids=${encodeURIComponent([...selection].join(","))}`;
+		anchor.rel = "noreferrer";
+		document.body.appendChild(anchor);
+		anchor.click();
+		anchor.remove();
+	};
+
+	const addSelectionToAlbum = async (album) => {
+		const ids = [...selection];
+		setBulkAlbumOpen(false);
+		const result = await bulkAddToAlbumAction(album.id, ids);
+		flashToast(result, (res) => `Added ${plural(res.count)} to "${album.name}".`);
 		setSelection(new Set());
 		router.refresh();
 	};
@@ -442,15 +501,33 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 					<button onClick={() => setSelection(new Set())} aria-label="Clear selection">
 						<Icon icon={IconX} />
 					</button>
-					<span className="text-sm font-medium">{selection.size} selected</span>
+					<span className="text-sm font-medium">{selection.size} {selection.size === 1 ? "item" : "items"} selected</span>
 					<div className="ml-auto flex items-center gap-1">
-						<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" onClick={favoriteSelection} aria-label="Add to favorites">
+						<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" onClick={favoriteSelection} aria-label={photos.some((photo) => selection.has(photo.id) && !photo.favorite) ? "Add to favorites" : "Remove from favorites"}>
 							<Icon icon={IconHeart} />
+						</button>
+						<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" onClick={downloadSelection} aria-label="Download">
+							<Icon icon={IconDownload} />
+						</button>
+						{addable && (
+							<div className="relative">
+								<button className={`grid h-10 w-10 place-items-center rounded-full transition hover:bg-white/15 ${bulkAlbumOpen ? "bg-white/20" : ""}`} onClick={toggleBulkAlbumMenu} aria-label="Add to album" aria-expanded={bulkAlbumOpen}>
+									<Icon icon={IconFolderPlus} />
+								</button>
+								{bulkAlbumOpen && (
+									<div ref={albumMenuRef} className="absolute right-0 top-full z-20 mt-2 w-60 rounded-xl border border-white/15 bg-zinc-900 py-1 text-xs text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+										{renderAlbumMenuItems(addSelectionToAlbum)}
+									</div>
+								)}
+							</div>
+						)}
+						<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" onClick={archiveSelection} aria-label={photos.some((photo) => selection.has(photo.id) && !photo.archived) ? "Move to archive" : "Restore from archive"}>
+							<Icon icon={IconArchive} />
 						</button>
 						<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" aria-label="Share">
 							<Icon icon={IconShare} />
 						</button>
-						<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" onClick={trashSelection} aria-label="Delete">
+						<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" onClick={trashSelection} aria-label="Move to trash">
 							<Icon icon={IconTrash} />
 						</button>
 					</div>
@@ -527,7 +604,7 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 															<Icon icon={IconTrash} size={15} /> Remove from album
 														</button>
 													</>
-												) : renderAlbumMenuItems(photo)}
+												) : renderAlbumMenuItems((album) => addPhotoToAlbum(album, photo.id))}
 											</div>
 										)}
 									</div>
@@ -569,7 +646,7 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 									</button>
 									{addToAlbumOpen && (
 										<div ref={albumMenuRef} className="absolute right-0 top-full z-20 mt-2 w-60 rounded-xl border border-white/15 bg-zinc-900 py-1 text-xs text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-											{renderAlbumMenuItems(viewerPhoto)}
+											{renderAlbumMenuItems((album) => addPhotoToAlbum(album, viewerPhoto.id))}
 										</div>
 									)}
 								</div>
@@ -629,6 +706,27 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 								<Icon icon={IconLocation} size={14} /> {[viewerPhoto.estCity, viewerPhoto.estCountry].filter(Boolean).join(", ")}
 							</div>
 						)}
+					</div>
+				</div>
+			)}
+
+			{confirmTrashOpen && selection.size > 0 && (
+				<div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-5" onClick={() => setConfirmTrashOpen(false)}>
+					<div className="w-full max-w-sm rounded-3xl border border-line bg-panel p-6" onClick={(event) => event.stopPropagation()}>
+						<h2 className="text-lg font-medium">Move to trash?</h2>
+						<p className="mt-1 text-xs text-muted">
+							{selection.size === 1
+								? "This item moves to Trash and is permanently deleted after 30 days."
+								: `These ${selection.size} items move to Trash and are permanently deleted after 30 days.`}
+						</p>
+						<div className="mt-5 flex justify-end gap-3">
+							<button type="button" className="h-10 rounded-full px-5 text-sm font-medium text-ink transition hover:bg-black/5" onClick={() => setConfirmTrashOpen(false)}>
+								Cancel
+							</button>
+							<button type="button" className="h-10 rounded-full bg-ink px-5 text-sm font-medium text-white transition hover:bg-black" onClick={confirmTrash}>
+								Move to trash
+							</button>
+						</div>
 					</div>
 				</div>
 			)}
