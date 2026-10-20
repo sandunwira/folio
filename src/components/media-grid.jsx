@@ -582,7 +582,7 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 					<div key={section.date} className="mb-3">
 						<div className="sticky top-16 z-10 mb-2 flex items-center gap-2.5 bg-surface py-2 md:top-1">
 							<button
-								className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border transition ${allSelected ? "border-ink bg-ink text-white" : sectionSelected > 0 ? "border-ink bg-ink/10 text-ink" : "border-faint bg-panel text-transparent hover:border-ink"}`}
+								className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border transition ${allSelected ? "border-ink bg-ink text-white" : sectionSelected > 0 ? "border-ink bg-ink/10 text-ink" : "border-faint bg-panel text-transparent hover:border-ink"}`}
 								onClick={() => toggleSection(section)}
 								aria-label={allSelected ? "Deselect all in group" : "Select all in group"}
 								aria-pressed={allSelected}

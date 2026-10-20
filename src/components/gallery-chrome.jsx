@@ -24,6 +24,7 @@ import {
 	IconX,
 } from "@tabler/icons-react";
 import Icon from "@/components/icon";
+import UserMenu from "@/components/user-menu";
 import { formatBytes } from "@/lib/format";
 
 const navItems = [
@@ -191,7 +192,7 @@ function UploadTray({ task, onClose, onRetry }) {
 	);
 }
 
-export default function GalleryChrome({ brand, storage }) {
+export default function GalleryChrome({ brand, storage, user }) {
 	const pathname = usePathname();
 	const router = useRouter();
 	const [drawerOpen, setDrawerOpen] = useState(false);
@@ -284,13 +285,11 @@ export default function GalleryChrome({ brand, storage }) {
 				</button>
 				<span className="text-[17px] font-medium">{activeTitle}</span>
 				<div className="ml-auto flex items-center gap-1">
-					<button onClick={() => setShowUpload(true)} aria-label="Upload" className="grid h-10 w-10 place-items-center rounded-full hover:bg-black/5">
-						<Icon icon={IconCloudUpload} />
-					</button>
+					<UserMenu user={user} />
 				</div>
 			</header>
 
-			<button className="fixed bottom-5 right-5 z-30 grid h-14 w-14 place-items-center rounded-2xl bg-ink text-white shadow-lg transition hover:bg-black hover:shadow-xl md:rounded-full" onClick={() => setShowUpload(true)} aria-label="Add photos">
+			<button className="fixed bottom-5 right-5 z-30 grid h-14 w-14 place-items-center bg-ink text-white shadow-lg transition hover:bg-black hover:shadow-xl rounded-full" onClick={() => setShowUpload(true)} aria-label="Add photos">
 				<Icon icon={IconCloudUpload} size={24} />
 			</button>
 
