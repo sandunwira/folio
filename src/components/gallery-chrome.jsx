@@ -203,6 +203,15 @@ export default function GalleryChrome({ brand, storage }) {
 		if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
 	}, []);
 
+	useEffect(() => {
+		if (!showUpload) return;
+		const previous = document.body.style.overflow;
+		document.body.style.overflow = "hidden";
+		return () => {
+			document.body.style.overflow = previous;
+		};
+	}, [showUpload]);
+
 	const startUploadTask = async (files) => {
 		setShowUpload(false);
 		setUploadTask({
