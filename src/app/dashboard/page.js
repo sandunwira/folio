@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { getSessionUser, countUsers, countAdmins, countActiveSessions, recentUsers, getSettings } from "@/lib/auth";
 import { computeUsedGb } from "@/lib/storage";
+import { IconDatabase } from "@tabler/icons-react";
 
 function StatCard({ label, value, sub, children }) {
 	return (
@@ -59,8 +60,24 @@ async function Content() {
 						Maintenance mode is on
 					</p>
 					<p className="mt-1 text-xs text-muted">Non-admin visitors see a maintenance notice instead of the archive. You can turn it off under Site settings.</p>
+					<a href="/api/admin/db" download className="mt-3 inline-flex h-9 items-center gap-2 rounded-full bg-ink px-4 text-xs font-medium text-white transition hover:bg-black">
+						<IconDatabase size={14} stroke={1.8} /> Download database
+					</a>
 				</section>
 			)}
+
+			<section className="rounded-3xl border border-line bg-panel p-6">
+				<p className="text-sm font-medium">Server backup</p>
+				<p className="mt-1 text-xs text-muted">Dump the entire live SQLite database as a downloadable file. Snapshots and config import/export live under Import / export.</p>
+				<div className="mt-3 flex flex-wrap gap-2">
+					<a href="/api/admin/db" download className="inline-flex h-10 items-center gap-2 rounded-full bg-ink px-4 text-sm font-medium text-white transition hover:bg-black">
+						<IconDatabase size={16} stroke={1.8} /> Download database
+					</a>
+					<Link href="/dashboard/import-export" className="inline-flex h-10 items-center rounded-full border border-line bg-surface px-4 text-sm font-medium text-ink transition hover:bg-black/5">
+						Import/Export &rarr;
+					</Link>
+				</div>
+			</section>
 
 			<section className="rounded-3xl border border-line bg-panel">
 				<div className="border-b border-line px-6 py-4">

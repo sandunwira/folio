@@ -1,16 +1,20 @@
 import Database from "better-sqlite3";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
 
-const db = new Database(path.join(process.cwd(), "folio.db"));
-db.pragma("journal_mode = WAL");
-db.pragma("foreign_keys = ON");
-db.pragma("busy_timeout = 5000");
-const SCHEMA_VERSION = 3;
-const dbVersion = db.pragma("user_version", { simple: true });
+let db = null;
+const SCHEMA_VERSION = 4;
 
-if (dbVersion < SCHEMA_VERSION) {
-	db.exec(`
+function connectDatabase() {
+	db = new Database(path.join(process.cwd(), "folio.db"));
+	db.pragma("journal_mode = WAL");
+	db.pragma("foreign_keys = ON");
+	db.pragma("busy_timeout = 5000");
+	const dbVersion = db.pragma("user_version", { simple: true });
+
+	if (dbVersion < SCHEMA_VERSION) {
+		db.exec(`
 		CREATE TABLE IF NOT EXISTS users (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			username TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -61,31 +65,55 @@ if (dbVersion < SCHEMA_VERSION) {
 		CREATE INDEX IF NOT EXISTS album_media_media ON album_media(media_id);
 	`);
 
-	for (const statement of [
-		"ALTER TABLE media ADD COLUMN url TEXT",
-		"ALTER TABLE media ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0",
-		"ALTER TABLE media ADD COLUMN archived INTEGER NOT NULL DEFAULT 0",
-		"ALTER TABLE media ADD COLUMN vaulted INTEGER NOT NULL DEFAULT 0",
-		"ALTER TABLE media ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
-		"ALTER TABLE media ADD COLUMN deleted_at INTEGER NOT NULL DEFAULT 0",
-		"ALTER TABLE media ADD COLUMN est_location TEXT",
-		"ALTER TABLE media ADD COLUMN est_city TEXT",
-		"ALTER TABLE media ADD COLUMN est_district TEXT",
-		"ALTER TABLE media ADD COLUMN est_state TEXT",
-		"ALTER TABLE media ADD COLUMN est_country TEXT",
-	]) {
-		try {
-			db.exec(statement);
-		} catch (error) {
-			if (!String(error).includes("duplicate column")) throw error;
+		for (const statement of [
+			"ALTER TABLE media ADD COLUMN url TEXT",
+			"ALTER TABLE media ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0",
+			"ALTER TABLE media ADD COLUMN archived INTEGER NOT NULL DEFAULT 0",
+			"ALTER TABLE media ADD COLUMN vaulted INTEGER NOT NULL DEFAULT 0",
+			"ALTER TABLE media ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0",
+			"ALTER TABLE media ADD COLUMN deleted_at INTEGER NOT NULL DEFAULT 0",
+			"ALTER TABLE media ADD COLUMN est_location TEXT",
+			"ALTER TABLE media ADD COLUMN est_city TEXT",
+			"ALTER TABLE media ADD COLUMN est_district TEXT",
+			"ALTER TABLE media ADD COLUMN est_state TEXT",
+			"ALTER TABLE media ADD COLUMN est_country TEXT",
+		]) {
+			try {
+				db.exec(statement);
+			} catch (error) {
+				if (!String(error).includes("duplicate column")) throw error;
+			}
 		}
+
+		db.prepare("DELETE FROM media WHERE user_id NOT IN (SELECT id FROM users)").run();
+		db.prepare("DELETE FROM sessions WHERE user_id NOT IN (SELECT id FROM users)").run();
+
+		db.pragma(`user_version = ${SCHEMA_VERSION}`);
 	}
 
-	db.prepare("DELETE FROM media WHERE user_id NOT IN (SELECT id FROM users)").run();
-	db.prepare("DELETE FROM sessions WHERE user_id NOT IN (SELECT id FROM users)").run();
+	db.exec(`
+		CREATE TABLE IF NOT EXISTS cron_jobs (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL,
+			job_type TEXT NOT NULL,
+			interval_minutes INTEGER NOT NULL DEFAULT 1440,
+			active INTEGER NOT NULL DEFAULT 1,
+			last_run INTEGER NOT NULL DEFAULT 0,
+			created_at INTEGER NOT NULL
+		);
+	`);
 
-	db.pragma(`user_version = ${SCHEMA_VERSION}`);
+	for (const job of [
+		{ name: "DB Snapshot Job", jobType: "snapshot", intervalMinutes: 120 },
+		{ name: "Configuration Snapshot Job", jobType: "config_export", intervalMinutes: 120 },
+	]) {
+		if (!db.prepare("SELECT id FROM cron_jobs WHERE job_type = ?").get(job.jobType)) {
+			db.prepare("INSERT INTO cron_jobs (name, job_type, interval_minutes, active, last_run, created_at) VALUES (?, ?, ?, 1, 0, ?)").run(job.name, job.jobType, job.intervalMinutes, Date.now());
+		}
+	}
 }
+
+connectDatabase();
 
 const DEFAULT_SETTINGS = {
 	app_name: "Folio",
@@ -300,4 +328,65 @@ export function renameMedia(id, title) {
 
 export function sumMediaBytes(userId) {
 	return db.prepare("SELECT COALESCE(SUM(size), 0) AS c FROM media WHERE user_id = ?").get(userId).c;
+}
+
+export function countMediaRows(userId) {
+	return db.prepare("SELECT COUNT(*) AS c FROM media WHERE user_id = ?").get(userId).c;
+}
+
+export function snapshotDb(destination) {
+	return db.backup(destination);
+}
+
+export function validateDatabaseFile(sourcePath) {
+	let test = null;
+	try {
+		test = new Database(sourcePath, { readonly: true });
+		const integrity = test.pragma("integrity_check", { simple: true });
+		if (integrity && String(integrity).toLowerCase() !== "ok") throw new Error("The uploaded file is not a healthy SQLite database.");
+		const tables = test.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name);
+		const missing = ["users", "sessions", "settings", "media"].filter((name) => !tables.includes(name));
+		if (missing.length > 0) throw new Error(`The uploaded database is missing required tables: ${missing.join(", ")}.`);
+	} catch (error) {
+		if (error.message.startsWith("SQLITE_NOTADB") || /file is not a database/i.test(String(error))) throw new Error("The uploaded file is not a SQLite database.");
+		throw error;
+	} finally {
+		try {
+			test?.close();
+		} catch { }
+	}
+}
+
+export function swapDatabaseFile(sourcePath) {
+	const root = process.cwd();
+	const now = new Date();
+	const pad = (value) => String(value).padStart(2, "0");
+	const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+	fs.mkdirSync(path.join(root, "data", "backups"), { recursive: true });
+	return db.backup(path.join(root, "data", "backups", `folio-pre-restore-${stamp}.db`)).then(() => {
+		db.close();
+		for (const suffix of ["-wal", "-shm"]) {
+			try {
+				fs.unlinkSync(path.join(root, `folio.db${suffix}`));
+			} catch { }
+		}
+		fs.copyFileSync(sourcePath, path.join(root, "folio.db"));
+		connectDatabase();
+	});
+}
+
+export function listCronJobRows() {
+	return db.prepare("SELECT * FROM cron_jobs ORDER BY created_at DESC, id DESC").all();
+}
+
+export function getCronJobRow(id) {
+	return db.prepare("SELECT * FROM cron_jobs WHERE id = ?").get(id);
+}
+
+export function setActiveCronJob(id, active) {
+	db.prepare("UPDATE cron_jobs SET active = ? WHERE id = ?").run(active ? 1 : 0, id);
+}
+
+export function touchCronJob(id, at) {
+	db.prepare("UPDATE cron_jobs SET last_run = ? WHERE id = ?").run(at, id);
 }

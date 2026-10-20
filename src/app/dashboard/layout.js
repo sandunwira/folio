@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { IconChevronLeft, IconPower } from "@tabler/icons-react";
 import { getSessionUser } from "@/lib/auth";
 import { logoutAction } from "@/lib/actions";
+import { runDueCronJobs } from "@/lib/cron";
 import AdminNav from "./AdminNav";
 
 export const metadata = { title: "Admin | Folio" };
@@ -11,6 +12,7 @@ export const metadata = { title: "Admin | Folio" };
 async function AdminSidebarContent() {
 	const user = await getSessionUser();
 	if (!user?.isAdmin) redirect("/");
+	await runDueCronJobs();
 
 	return (
 		<>

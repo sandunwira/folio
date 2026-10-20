@@ -38,6 +38,16 @@ const eventLabels = {
 	album_deleted: "Album deleted",
 	media_added_to_album: "Added to album",
 	media_removed_from_album: "Removed from album",
+	snapshot_created: "Snapshot created",
+	config_exported: "Configuration exported",
+	config_imported: "Configuration imported",
+	cronjob_created: "Cron job created",
+	cronjob_updated: "Cron job updated",
+	cronjob_deleted: "Cron job deleted",
+	cronjob_paused: "Cron job paused",
+	cronjob_resumed: "Cron job resumed",
+	cronjob_ran: "Cron job ran",
+	server_file_deleted: "Server file deleted",
 	logout: "Logout",
 };
 
@@ -54,7 +64,7 @@ async function Content({ searchParams }) {
 	return (
 		<div className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-8 sm:px-6">
 			<div>
-				<h1 className="text-[22px] font-medium">Audit logs</h1>
+				<h1 className="text-[22px] font-medium">Audit Logs</h1>
 				<p className="mt-1 text-sm text-muted">Server and account activity. Media contents are never logged, only who did what, and when.</p>
 			</div>
 

@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconHistory, IconLayoutDashboard, IconSettings, IconUsers } from "@tabler/icons-react";
+import { IconClock, IconFileExport, IconHistory, IconLayoutDashboard, IconServer, IconSettings, IconUsers } from "@tabler/icons-react";
 
 const items = [
 	{ href: "/dashboard", label: "Overview", icon: IconLayoutDashboard },
 	{ href: "/dashboard/users", label: "Users", icon: IconUsers },
+	{ href: "/dashboard/import-export", label: "Import/Export", icon: IconFileExport },
+	{ href: "/dashboard/cronjobs", label: "Cron Jobs", icon: IconClock },
+	{ href: "/dashboard/storage", label: "Storage", icon: IconServer },
 	{ href: "/dashboard/logs", label: "Logs", icon: IconHistory },
-	{ href: "/settings", label: "Site settings", icon: IconSettings },
+	{ href: "/settings", label: "Site Settings", icon: IconSettings },
 ];
 
 export default function AdminNav() {

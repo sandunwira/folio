@@ -24,3 +24,31 @@ export async function computeUsedGb() {
 		return null;
 	}
 }
+
+async function safeWalkSize(dir) {
+	try {
+		return await walkSize(dir);
+	} catch {
+		return 0;
+	}
+}
+
+async function statSize(file) {
+	try {
+		return (await fs.stat(file)).size;
+	} catch {
+		return 0;
+	}
+}
+
+export async function computeStorageReport() {
+	const dataDir = path.join(process.cwd(), "data");
+	const database = (await statSize(path.join(process.cwd(), "folio.db"))) + (await statSize(path.join(process.cwd(), "folio.db-wal"))) + (await statSize(path.join(process.cwd(), "folio.db-shm")));
+	return {
+		uploads: await safeWalkSize(UPLOAD_DIR),
+		thumbs: await safeWalkSize(path.join(dataDir, "thumbs")),
+		backups: await safeWalkSize(path.join(dataDir, "backups")),
+		exports: await safeWalkSize(path.join(dataDir, "exports")),
+		database,
+	};
+}

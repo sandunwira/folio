@@ -3,9 +3,12 @@
 import { unlink } from "node:fs/promises";
 import path from "node:path";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { checkLogin, countAdmins, countUsers, createAlbum, createSession, createUser, deleteAlbumRow, deleteMediaRow, destroySession, deleteUser, getAlbum, getMediaRow, getSettings, getSessionUser, getUserByUsername, getUserById, listEvents, listMediaRows, logEvent, renameAlbum, renameMedia, addAlbumMedia, removeAlbumMedia, setMediaArchived, setMediaFavorite, setMediaTrashed, setMediaVaulted, setSettings } from "@/lib/auth";
 import { UPLOAD_DIR } from "@/lib/uploads";
 import { syncArchiveZip } from "@/lib/archive";
+import { BACKUP_DIR, EXPORT_DIR, CRON_JOB_TYPES, createSnapshot, deleteFile, executeJobType, exportConfigFile, importConfig } from "@/lib/cron";
+import { getCronJobRow, setActiveCronJob, touchCronJob } from "@/lib/auth";
 
 const usernamePattern = /^[a-z0-9_.-]{2,32}$/;
 
@@ -95,7 +98,9 @@ export async function updateAdminSettingsAction(formData) {
 	const appName = String(formData.get("appName") ?? "").trim().slice(0, 40);
 	const maintenance = formData.get("maintenance") === "on";
 	const sessionDays = Number(formData.get("sessionDays"));
-	const quotaGb = Number(formData.get("quotaGb"));
+	const currentQuota = Number(getSettings().quota_gb);
+	const quotaInput = formData.get("quotaGb");
+	const quotaGb = quotaInput === null ? currentQuota : Number(quotaInput);
 
 	const failPath = (message) => `/settings?error=${encodeURIComponent(message)}`;
 	if (!appName) redirect(failPath("Please enter an archive name."));
@@ -315,4 +320,88 @@ export async function trashMediaAction(photoId) {
 		logEvent("media_trashed", user.username, `Moved "${row.title}" to Trash`);
 	}
 	return { ok: true, trashed: !row.trashed };
+}
+
+async function requireAdmin() {
+	const user = await getSessionUser();
+	return user?.isAdmin ? user : null;
+}
+
+function formatSize(bytes) {
+	const units = ["B", "KB", "MB", "GB"];
+	let value = Number(bytes) || 0;
+	let unit = 0;
+	while (value >= 1024 && unit < units.length - 1) {
+		value /= 1024;
+		unit += 1;
+	}
+	return `${value.toFixed(value >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`;
+}
+
+function describeJobResult(jobType, result) {
+	return `${CRON_JOB_TYPES[jobType]} — ${result?.filename ?? "done"}${result?.size != null ? ` (${formatSize(result.size)})` : ""}`;
+}
+
+export async function createSnapshotAction() {
+	const user = await requireAdmin();
+	if (!user) return { ok: false, error: "Admin access required." };
+	const result = await createSnapshot();
+	logEvent("snapshot_created", user.username, describeJobResult("snapshot", result));
+	revalidatePath("/dashboard/import-export");
+	revalidatePath("/dashboard/cronjobs");
+	return { ok: true, count: 1 };
+}
+
+export async function deleteFileAction(kind, name) {
+	const user = await requireAdmin();
+	if (!user) return { ok: false, error: "Admin access required." };
+	const removed = deleteFile(kind, name);
+	if (removed) logEvent("server_file_deleted", user.username, `Deleted ${kind} file "${name}"`);
+	revalidatePath("/dashboard/import-export");
+	return { ok: removed, count: removed ? 1 : 0 };
+}
+
+export async function exportConfigAction() {
+	const user = await requireAdmin();
+	if (!user) return { ok: false, error: "Admin access required." };
+	const result = await exportConfigFile();
+	logEvent("config_exported", user.username, describeJobResult("config_export", result));
+	revalidatePath("/dashboard/import-export");
+	return { ok: true, path: result.path };
+}
+
+export async function importConfigAction(formData) {
+	const user = await requireAdmin();
+	if (!user) return { ok: false, error: "Admin access required." };
+	const file = formData.get("config");
+	if (!file || typeof file === "string") return { ok: false, error: "Choose a configuration JSON file to import." };
+	const result = importConfig(await file.text());
+	if (result.error) return result;
+	logEvent("config_imported", user.username, `Imported configuration (${result.count} setting${result.count === 1 ? "" : "s"}) from "${file.name}"`);
+	revalidatePath("/dashboard/import-export");
+	revalidatePath("/settings");
+	return { ok: true, count: result.count };
+}
+
+export async function toggleCronAction(id) {
+	const user = await requireAdmin();
+	if (!user) return { ok: false, error: "Admin access required." };
+	const job = getCronJobRow(Number(id));
+	if (!job) return { ok: false, error: "Job not found." };
+	setActiveCronJob(job.id, !job.active);
+	logEvent(job.active ? "cronjob_paused" : "cronjob_resumed", user.username, `${job.active ? "Paused" : "Resumed"} cron job "${job.name}"`);
+	revalidatePath("/dashboard/cronjobs");
+	return { ok: true, active: !job.active };
+}
+
+export async function runCronAction(id) {
+	const user = await requireAdmin();
+	if (!user) return { ok: false, error: "Admin access required." };
+	const job = getCronJobRow(Number(id));
+	if (!job) return { ok: false, error: "Job not found." };
+	const result = await executeJobType(job.job_type);
+	touchCronJob(job.id, Date.now());
+	logEvent("cronjob_ran", user.username, `Manual run of "${job.name}" — ${describeJobResult(job.job_type, result)}`);
+	revalidatePath("/dashboard/cronjobs");
+	return { ok: true };
 }

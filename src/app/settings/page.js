@@ -81,11 +81,6 @@ async function Content({ searchParams }) {
 								<span className="text-xs font-medium text-ink">Session lifetime (days)</span>
 								<input name="sessionDays" type="number" min={1} max={365} required defaultValue={settings.session_days} className="h-10 rounded-full border border-line bg-surface px-4 text-sm text-ink outline-none focus:border-ink" />
 							</label>
-							<label className="flex flex-col gap-1.5">
-								<span className="text-xs font-medium text-ink">Storage quota (GB)</span>
-								<input name="quotaGb" type="number" min={1} step="any" required defaultValue={settings.quota_gb} className="h-10 rounded-full border border-line bg-surface px-4 text-sm text-ink outline-none focus:border-ink" />
-								<span className="text-[11px] text-faint">Actual usage is auto-computed from <code>data/uploads</code>.</span>
-							</label>
 							<div className="flex flex-col gap-1.5">
 								<span className="text-xs font-medium text-ink">Maintenance mode</span>
 								<label className="flex min-h-10 items-center gap-2 text-sm text-ink">

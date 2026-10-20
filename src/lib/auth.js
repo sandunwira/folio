@@ -37,6 +37,14 @@ export {
 	renameAlbum,
 	deleteAlbumRow,
 	sumMediaBytes,
+	countMediaRows,
+	listCronJobRows,
+	getCronJobRow,
+	setActiveCronJob,
+	touchCronJob,
+	snapshotDb,
+	validateDatabaseFile,
+	swapDatabaseFile,
 } from "./db";
 
 export async function createSession(userId, days = SESSION_DAYS) {
