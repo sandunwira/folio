@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { listUserMedia } from "@/lib/uploads";
 import CoverThumb from "@/components/cover-thumb";
 import MediaTitle, { toPublicUser } from "@/components/media-title";
+import { IconLocation } from '@tabler/icons-react';
 
 async function Content({ searchParams }) {
 	const { q } = await searchParams;
@@ -39,6 +40,7 @@ async function Content({ searchParams }) {
 				</div>
 			) : (
 				<div className="py-28 text-center">
+					<IconLocation className="mx-auto text-faint" size={32} stroke={1.8} aria-hidden="true" />
 					<h2 className="mt-4 text-lg font-medium">{query ? "No results found" : "No places yet"}</h2>
 					<p className="mx-auto mt-1 max-w-sm text-sm text-muted">{query ? `No matches for "${query}". Try a different search.` : "Photos with locations will show up here."}</p>
 				</div>

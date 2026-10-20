@@ -44,9 +44,7 @@ async function Content({ searchParams }) {
 				</div>
 			) : (
 				<div className="py-28 text-center">
-					<div className="grid h-16 w-16 place-items-center justify-self-center rounded-full bg-panel text-muted">
-						<IconPlus size={28} stroke={1.5} aria-hidden="true" />
-					</div>
+					<IconPlus className="mx-auto text-faint" size={32} stroke={1.8} aria-hidden="true" />
 					<h2 className="mt-4 text-lg font-medium">{query ? "No results found" : "No albums yet"}</h2>
 					<p className="mx-auto mt-1 max-w-sm text-sm text-muted">{query ? `No matches for "${query}". Try a different search.` : "Create an album above and add photos to it from the media page or the lightbox."}</p>
 				</div>
