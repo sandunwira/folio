@@ -136,13 +136,10 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 	const [exifById, setExifById] = useState({});
 	const exifFetchRef = useRef({});
 	const [toast, setToast] = useState(null);
-	const [cardMenuFor, setCardMenuFor] = useState(null);
+	const [albumPicker, setAlbumPicker] = useState(null);
 	const [confirmTrashOpen, setConfirmTrashOpen] = useState(false);
-	const [bulkAlbumOpen, setBulkAlbumOpen] = useState(false);
-	const [addToAlbumOpen, setAddToAlbumOpen] = useState(false);
 	const [albumChoices, setAlbumChoices] = useState(null);
 	const [albumNameInput, setAlbumNameInput] = useState("");
-	const albumMenuRef = useRef(null);
 	const infoButtonRef = useRef(null);
 	const infoPanelRef = useRef(null);
 
@@ -170,15 +167,11 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 	};
 
 	useEffect(() => {
-		if (viewerIndex < 0 && !addToAlbumOpen && !cardMenuFor) return;
+		if (viewerIndex < 0 && !albumPicker) return;
 		const onKey = (event) => {
 			if (event.key === "Escape") {
-				if (bulkAlbumOpen) {
-					setBulkAlbumOpen(false);
-					return;
-				}
-				if (addToAlbumOpen) {
-					setAddToAlbumOpen(false);
+				if (albumPicker) {
+					setAlbumPicker(null);
 					return;
 				}
 				if (moreOpen) {
@@ -194,31 +187,7 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [viewerIndex, visiblePhotos, moreOpen, addToAlbumOpen, bulkAlbumOpen, cardMenuFor]);
-
-	useEffect(() => {
-		if (!cardMenuFor && !bulkAlbumOpen && !addToAlbumOpen) return;
-		const onPointerDown = (event) => {
-			if (albumMenuRef.current && !albumMenuRef.current.contains(event.target)) {
-				setCardMenuFor(null);
-				setBulkAlbumOpen(false);
-				setAddToAlbumOpen(false);
-			}
-		};
-		const onKeyDown = (event) => {
-			if (event.key === "Escape") {
-				setCardMenuFor(null);
-				setBulkAlbumOpen(false);
-				setAddToAlbumOpen(false);
-			}
-		};
-		document.addEventListener("mousedown", onPointerDown);
-		document.addEventListener("keydown", onKeyDown);
-		return () => {
-			document.removeEventListener("mousedown", onPointerDown);
-			document.removeEventListener("keydown", onKeyDown);
-		};
-	}, [cardMenuFor, bulkAlbumOpen, addToAlbumOpen]);
+	}, [viewerIndex, visiblePhotos, moreOpen, albumPicker]);
 
 	useEffect(() => {
 		if (!confirmTrashOpen) return;
@@ -228,6 +197,15 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 		document.addEventListener("keydown", onKeyDown);
 		return () => document.removeEventListener("keydown", onKeyDown);
 	}, [confirmTrashOpen]);
+
+	useEffect(() => {
+		if (!albumPicker && !confirmTrashOpen) return;
+		const previous = document.body.style.overflow;
+		document.body.style.overflow = "hidden";
+		return () => {
+			document.body.style.overflow = previous;
+		};
+	}, [albumPicker, confirmTrashOpen]);
 
 	useEffect(() => {
 		if (!toast) return;
@@ -362,46 +340,34 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 		}
 	};
 
-	const openCardAlbumMenu = (photoId) => {
-		setAddToAlbumOpen(false);
-		setCardMenuFor(photoId);
+	const openCardAlbumMenu = (photo) => {
 		loadAlbumChoices();
+		setAlbumPicker({ kind: "card", photoId: photo.id, title: photo.title, remove: !!removableAlbumId });
 	};
 
 	const toggleViewerAlbumMenu = () => {
-		setCardMenuFor(null);
-		setBulkAlbumOpen(false);
-		if (addToAlbumOpen) {
-			setAddToAlbumOpen(false);
-			return;
-		}
-		setAddToAlbumOpen(true);
 		loadAlbumChoices();
+		setAlbumPicker({ kind: "viewer", photoId: viewerPhoto.id, title: viewerPhoto.title });
 	};
 
 	const toggleBulkAlbumMenu = () => {
-		setCardMenuFor(null);
-		setAddToAlbumOpen(false);
-		if (bulkAlbumOpen) {
-			setBulkAlbumOpen(false);
-			return;
-		}
-		setBulkAlbumOpen(true);
 		loadAlbumChoices();
+		setAlbumPicker({ kind: "bulk" });
 	};
+
+	const closeAlbumPicker = () => setAlbumPicker(null);
 
 	const addPhotoToAlbum = async (album, photoId) => {
 		const result = await addMediaToAlbumAction(album.id, photoId);
 		flashToast(result, `Added to "${album.name}".`);
-		setCardMenuFor(null);
-		setAddToAlbumOpen(false);
+		closeAlbumPicker();
 		router.refresh();
 	};
 
-	const removePhotoFromAlbum = async (photo) => {
-		const result = await removeMediaFromAlbumAction(removableAlbumId, photo.id);
+	const removePhotoFromAlbum = async (photoId) => {
+		const result = await removeMediaFromAlbumAction(removableAlbumId, photoId);
 		flashToast(result, "Removed from album.");
-		setCardMenuFor(null);
+		closeAlbumPicker();
 		router.refresh();
 	};
 
@@ -419,33 +385,6 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 			router.refresh();
 		}
 	};
-
-	const renderAlbumMenuItems = (onPick) => (
-		<>
-			<p className="px-2.5 pb-1.5 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-white/40">Add to album</p>
-			<div className="max-h-44 overflow-y-auto">
-				{albumChoices === null ? (
-					<p className="px-2.5 py-1.5 text-white/60">Loading albums…</p>
-				) : albumChoices.length === 0 ? (
-					<p className="px-2.5 py-1.5 text-white/60">No albums yet, create one below.</p>
-				) : (
-					albumChoices.map((album) => (
-						<button key={album.id} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition hover:bg-white/10" onClick={() => onPick(album)}>
-							<Icon icon={IconAlbum} size={15} />
-							<span className="min-w-0 flex-1 truncate">{album.name}</span>
-							<span className="text-white/40">{album.count}</span>
-						</button>
-					))
-				)}
-			</div>
-			<form onSubmit={createAlbumInline} className="mt-1 flex items-center gap-1.5 border-t border-white/10 px-2 py-2">
-				<input value={albumNameInput} onChange={(event) => setAlbumNameInput(event.target.value)} maxLength={80} placeholder="New album name" aria-label="New album name" className="min-w-0 flex-1 rounded-full border border-white/20 bg-transparent px-3 py-1 text-xs text-white placeholder:text-white/40 outline-none focus:border-white/50" />
-				<button type="submit" disabled={!albumNameInput.trim()} className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white/15 transition hover:bg-white/25 disabled:opacity-40" aria-label="Create album">
-					<Icon icon={IconPlus} size={14} />
-				</button>
-			</form>
-		</>
-	);
 
 	const copyViewerLink = async () => {
 		try {
@@ -548,16 +487,9 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 									<Icon icon={IconDownload} />
 								</button>
 								{addable && (
-									<div className="relative">
-										<button className={`grid h-10 w-10 place-items-center rounded-full transition hover:bg-white/15 ${bulkAlbumOpen ? "bg-white/20" : ""}`} onClick={toggleBulkAlbumMenu} aria-label="Add to album" aria-expanded={bulkAlbumOpen}>
-											<Icon icon={IconFolderPlus} />
-										</button>
-										{bulkAlbumOpen && (
-											<div ref={albumMenuRef} className="absolute right-0 top-full z-20 mt-2 w-60 rounded-xl border border-white/15 bg-zinc-900 py-1 text-xs text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-												{renderAlbumMenuItems(addSelectionToAlbum)}
-											</div>
-										)}
-									</div>
+									<button className="grid h-10 w-10 place-items-center rounded-full transition hover:bg-white/15" onClick={toggleBulkAlbumMenu} aria-label="Add to album">
+										<Icon icon={IconFolderPlus} />
+									</button>
 								)}
 								<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" onClick={archiveSelection} aria-label={photos.some((photo) => selection.has(photo.id) && !photo.archived) ? "Move to archive" : "Restore from archive"}>
 									<Icon icon={IconArchive} />
@@ -620,7 +552,7 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 													<Icon icon={IconHeartFilled} size={12} />
 												</span>
 											)}
-											<span className={`absolute left-2 top-2 grid h-6 w-6 place-items-center rounded-full border-2 transition ${isSelected ? "border-white bg-ink text-white opacity-100" : "border-white bg-black/20 text-transparent opacity-0 group-hover:opacity-100"}`} onClick={(event) => { event.stopPropagation(); toggleSelect(photo.id); }} aria-label="Select photo">
+											<span className={`absolute left-2 top-2 grid h-6 w-6 place-items-center rounded-full border-2 transition ${isSelected ? "border-white bg-ink text-white opacity-100" : "border-white bg-black/20 text-transparent opacity-100 md:opacity-0 md:group-hover:opacity-100"}`} onClick={(event) => { event.stopPropagation(); toggleSelect(photo.id); }} aria-label="Select photo">
 												<Icon icon={IconCheck} size={14} />
 											</span>
 											{(photo.estLocation || photo.location) && (
@@ -631,26 +563,14 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 											<span className="pointer-events-none absolute inset-0 hidden rounded-lg group-hover:block group-hover:bg-black/10" />
 										</button>
 										{(addable || removableAlbumId) && (
-											<button className={`absolute bottom-2 right-2 grid h-7 w-7 place-items-center rounded-full bg-black/40 text-white opacity-0 transition group-hover:opacity-100 ${cardMenuFor === photo.id ? "opacity-100" : ""}`} onClick={(event) => { event.stopPropagation(); openCardAlbumMenu(photo.id); }} aria-label="Album options">
+											<button className={`absolute bottom-2 right-2 grid h-7 w-7 place-items-center rounded-full bg-black/40 text-white opacity-100 transition md:opacity-0 md:group-hover:opacity-100`} onClick={(event) => { event.stopPropagation(); openCardAlbumMenu(photo); }} aria-label="Album options">
 												<Icon icon={IconFolderPlus} size={15} />
 											</button>
 										)}
 										{(restore || archiveOnly) && (
-											<button className={`absolute bottom-2 right-2 grid h-7 w-7 place-items-center rounded-full bg-black/40 text-white opacity-0 transition group-hover:opacity-100`} onClick={(event) => { event.stopPropagation(); (restore ? restorePhoto : archivePhoto)(photo); }} aria-label={restore ? "Restore to library" : "Restore to your media"}>
+											<button className={`absolute bottom-2 right-2 grid h-7 w-7 place-items-center rounded-full bg-black/40 text-white opacity-100 transition md:opacity-0 md:group-hover:opacity-100`} onClick={(event) => { event.stopPropagation(); (restore ? restorePhoto : archivePhoto)(photo); }} aria-label={restore ? "Restore to library" : "Restore to your media"}>
 												<Icon icon={IconArrowBackUp} size={15} />
 											</button>
-										)}
-										{cardMenuFor === photo.id && (
-											<div ref={albumMenuRef} className="absolute bottom-11 right-2 z-30 w-56 rounded-xl border border-white/15 bg-zinc-900 p-1 text-xs text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-												{removableAlbumId ? (
-													<>
-														<p className="px-2.5 pb-1.5 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-white/40">Album actions</p>
-														<button className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition hover:bg-white/10" onClick={() => removePhotoFromAlbum(photo)}>
-															<Icon icon={IconTrash} size={15} /> Remove from album
-														</button>
-													</>
-												) : renderAlbumMenuItems((album) => addPhotoToAlbum(album, photo.id))}
-											</div>
 										)}
 									</div>
 								);
@@ -702,16 +622,9 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 										<Icon icon={IconDownload} />
 									</a>
 									{addable && (
-										<div className="relative">
-											<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 max-md:hidden" onClick={toggleViewerAlbumMenu} aria-label="Add to album" aria-expanded={addToAlbumOpen}>
-												<Icon icon={IconFolderPlus} />
-											</button>
-											{addToAlbumOpen && (
-												<div ref={albumMenuRef} className="absolute right-0 top-full z-20 mt-2 w-60 rounded-xl border border-white/15 bg-zinc-900 py-1 text-xs text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-													{renderAlbumMenuItems((album) => addPhotoToAlbum(album, viewerPhoto.id))}
-												</div>
-											)}
-										</div>
+										<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 max-md:hidden" onClick={toggleViewerAlbumMenu} aria-label="Add to album">
+											<Icon icon={IconFolderPlus} />
+										</button>
 									)}
 									<button ref={infoButtonRef} className={`grid h-10 w-10 place-items-center rounded-full transition hover:bg-white/10 ${infoOpen ? "bg-white/20" : ""}`} onClick={() => setInfoOpen((value) => !value)} aria-label="Info" aria-pressed={infoOpen}>
 										<Icon icon={IconInfoCircle} />
@@ -796,6 +709,50 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 								Move to trash
 							</button>
 						</div>
+					</div>
+				</div>
+			)}
+
+			{albumPicker && (
+				<div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-5" onClick={closeAlbumPicker}>
+					<div className="w-full max-w-sm rounded-3xl border border-line bg-panel p-6" onClick={(event) => event.stopPropagation()}>
+						<h2 className="text-lg font-medium">{albumPicker.remove ? "Album actions" : "Add to album"}</h2>
+						<p className="mt-1 text-xs text-muted">
+							{albumPicker.remove
+								? `Remove "${albumPicker.title}" from this album.`
+								: albumPicker.kind === "bulk"
+									? `${selection.size} ${selection.size === 1 ? "item" : "items"} will be added.`
+									: `Pick an album for "${albumPicker.title}".`}
+						</p>
+						{albumPicker.remove ? (
+							<button className="mt-4 flex w-full items-center gap-2 rounded-xl bg-surface px-3 py-2.5 text-left text-sm text-red-600 transition hover:bg-black/5" onClick={() => removePhotoFromAlbum(albumPicker.photoId)}>
+								<Icon icon={IconTrash} size={16} /> Remove from album
+							</button>
+						) : (
+							<>
+								<div className="mt-4 max-h-56 overflow-y-auto rounded-xl border border-line bg-surface p-1.5">
+									{albumChoices === null ? (
+										<p className="px-2.5 py-2 text-xs text-muted">Loading albums…</p>
+									) : albumChoices.length === 0 ? (
+										<p className="px-2.5 py-2 text-xs text-muted">No albums yet. Create one below.</p>
+									) : (
+										albumChoices.map((album) => (
+											<button key={album.id} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-ink transition hover:bg-black/5" onClick={() => (albumPicker.kind === "bulk" ? addSelectionToAlbum(album) : addPhotoToAlbum(album, albumPicker.photoId))}>
+												<Icon icon={IconAlbum} size={15} />
+												<span className="min-w-0 flex-1 truncate">{album.name}</span>
+												<span className="text-xs text-faint">{album.count}</span>
+											</button>
+										))
+									)}
+								</div>
+								<form onSubmit={createAlbumInline} className="mt-3 flex items-center gap-2">
+									<input value={albumNameInput} onChange={(event) => setAlbumNameInput(event.target.value)} maxLength={80} placeholder="New album name" aria-label="New album name" className="h-10 min-w-0 flex-1 rounded-full border border-line bg-surface px-4 text-xs text-ink outline-none placeholder:text-faint focus:border-ink" />
+									<button type="submit" disabled={!albumNameInput.trim()} className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ink text-white transition hover:bg-black disabled:opacity-40" aria-label="Create album">
+										<Icon icon={IconPlus} size={14} />
+									</button>
+								</form>
+							</>
+						)}
 					</div>
 				</div>
 			)}
