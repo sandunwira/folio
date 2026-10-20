@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { addMediaToAlbumAction, bulkAddToAlbumAction, bulkArchiveAction, bulkFavoriteAction, bulkTrashAction, createAlbumAction, moveToArchiveAction, moveToVaultAction, removeMediaFromAlbumAction, renameMediaAction, toggleMediaFavoriteAction, trashMediaAction } from "@/lib/actions";
+import { addMediaToAlbumAction, bulkAddToAlbumAction, bulkArchiveAction, bulkFavoriteAction, bulkRestoreAction, bulkTrashAction, createAlbumAction, moveToArchiveAction, moveToVaultAction, removeMediaFromAlbumAction, renameMediaAction, restoreMediaAction, toggleMediaFavoriteAction, trashMediaAction } from "@/lib/actions";
 import { IconPlus } from "@tabler/icons-react";
 import {
 	IconAlbum,
 	IconArchive,
+	IconArrowBackUp,
 	IconCheck,
 	IconChevronDown,
 	IconChevronLeft,
@@ -63,7 +64,7 @@ function buildInfoRows(photo, exifInfo) {
 	return rows;
 }
 
-function MoreMenu({ open, setOpen, photo, onCopyLink, onVault, onArchive, onRenameSubmit, onFavorite, onDelete, onAddToAlbum, addable = false }) {
+function MoreMenu({ open, setOpen, photo, onCopyLink, onVault, onArchive, onRenameSubmit, onFavorite, onDelete, onRestore, onAddToAlbum, addable = false }) {
 	const menuRef = useRef(null);
 	const [renaming, setRenaming] = useState(false);
 
@@ -97,6 +98,14 @@ function MoreMenu({ open, setOpen, photo, onCopyLink, onVault, onArchive, onRena
 							<input type="hidden" name="id" value={photo.id} />
 							<input name="title" defaultValue={photo.title} autoFocus required placeholder="Media name" aria-label="Media name" className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none" />
 						</form>
+					) : photo.trashed ? (
+						<>
+							<button className={`${itemClass} font-medium`} onClick={() => { setOpen(false); onRestore(); }}>Restore to library</button>
+							<button className={itemClass} onClick={onCopyLink}>Copy link</button>
+							<a className={`${itemClass}`} href={photo.large ?? photo.image} download target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>Download</a>
+							{addable && <button className={`${itemClass}`} onClick={() => { setOpen(false); onAddToAlbum(); }}>Add to album</button>}
+							<button className={`${itemClass} text-red-600`} onClick={() => { setOpen(false); onDelete(); }}>Delete permanently</button>
+						</>
 					) : (
 						<>
 							<button className={itemClass} onClick={() => setRenaming(true)}>Rename</button>
@@ -117,7 +126,7 @@ function MoreMenu({ open, setOpen, photo, onCopyLink, onVault, onArchive, onRena
 
 const emptyIcons = { photo: IconPhoto, search: IconSearch, lock: IconLock, trash: IconTrash, wand: IconWand };
 
-export default function MediaGrid({ photos, query = "", emptyState = {}, addable = false, removableAlbumId = null }) {
+export default function MediaGrid({ photos, query = "", emptyState = {}, addable = false, removableAlbumId = null, restore = false, archiveOnly = false }) {
 	const router = useRouter();
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
@@ -313,6 +322,22 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 		router.refresh();
 	};
 
+	const restorePhoto = async (photo) => {
+		const result = await restoreMediaAction(photo.id);
+		flashToast(result, "Restored to your library.");
+		setMoreOpen(false);
+		setCardMenuFor(null);
+		router.refresh();
+	};
+
+	const restoreSelection = async () => {
+		const ids = [...selection];
+		const result = await bulkRestoreAction(ids);
+		flashToast(result, (res) => `Restored ${plural(res.count)} to your library.`);
+		setSelection(new Set());
+		router.refresh();
+	};
+
 	const vaultPhoto = async (photo) => {
 		const result = await moveToVaultAction(photo.id);
 		flashToast(result, (res) => (res.vaulted ? "Moved to Vault." : "Removed from Vault."));
@@ -503,31 +528,46 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 					</button>
 					<span className="text-sm font-medium">{selection.size} {selection.size === 1 ? "item" : "items"} selected</span>
 					<div className="ml-auto flex items-center gap-1">
-						<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" onClick={favoriteSelection} aria-label={photos.some((photo) => selection.has(photo.id) && !photo.favorite) ? "Add to favorites" : "Remove from favorites"}>
-							<Icon icon={IconHeart} />
-						</button>
-						<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" onClick={downloadSelection} aria-label="Download">
-							<Icon icon={IconDownload} />
-						</button>
-						{addable && (
-							<div className="relative">
-								<button className={`grid h-10 w-10 place-items-center rounded-full transition hover:bg-white/15 ${bulkAlbumOpen ? "bg-white/20" : ""}`} onClick={toggleBulkAlbumMenu} aria-label="Add to album" aria-expanded={bulkAlbumOpen}>
-									<Icon icon={IconFolderPlus} />
+						{restore || archiveOnly ? (
+							<span className="flex items-center gap-1">
+								<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" onClick={restore ? restoreSelection : archiveSelection} aria-label={restore ? "Restore to library" : "Restore from archive"}>
+									<Icon icon={IconArrowBackUp} />
 								</button>
-								{bulkAlbumOpen && (
-									<div ref={albumMenuRef} className="absolute right-0 top-full z-20 mt-2 w-60 rounded-xl border border-white/15 bg-zinc-900 py-1 text-xs text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-										{renderAlbumMenuItems(addSelectionToAlbum)}
+								{!restore && (
+									<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" onClick={downloadSelection} aria-label="Download">
+										<Icon icon={IconDownload} />
+									</button>
+								)}
+							</span>
+						) : (
+							<>
+								<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" onClick={favoriteSelection} aria-label={photos.some((photo) => selection.has(photo.id) && !photo.favorite) ? "Add to favorites" : "Remove from favorites"}>
+									<Icon icon={IconHeart} />
+								</button>
+								<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" onClick={downloadSelection} aria-label="Download">
+									<Icon icon={IconDownload} />
+								</button>
+								{addable && (
+									<div className="relative">
+										<button className={`grid h-10 w-10 place-items-center rounded-full transition hover:bg-white/15 ${bulkAlbumOpen ? "bg-white/20" : ""}`} onClick={toggleBulkAlbumMenu} aria-label="Add to album" aria-expanded={bulkAlbumOpen}>
+											<Icon icon={IconFolderPlus} />
+										</button>
+										{bulkAlbumOpen && (
+											<div ref={albumMenuRef} className="absolute right-0 top-full z-20 mt-2 w-60 rounded-xl border border-white/15 bg-zinc-900 py-1 text-xs text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+												{renderAlbumMenuItems(addSelectionToAlbum)}
+											</div>
+										)}
 									</div>
 								)}
-							</div>
+								<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" onClick={archiveSelection} aria-label={photos.some((photo) => selection.has(photo.id) && !photo.archived) ? "Move to archive" : "Restore from archive"}>
+									<Icon icon={IconArchive} />
+								</button>
+								<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" aria-label="Share">
+									<Icon icon={IconShare} />
+								</button>
+							</>
 						)}
-						<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" onClick={archiveSelection} aria-label={photos.some((photo) => selection.has(photo.id) && !photo.archived) ? "Move to archive" : "Restore from archive"}>
-							<Icon icon={IconArchive} />
-						</button>
-						<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" aria-label="Share">
-							<Icon icon={IconShare} />
-						</button>
-						<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" onClick={trashSelection} aria-label="Move to trash">
+						<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" onClick={trashSelection} aria-label={restore || archiveOnly ? "Delete" : "Move to trash"}>
 							<Icon icon={IconTrash} />
 						</button>
 					</div>
@@ -595,6 +635,11 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 												<Icon icon={IconFolderPlus} size={15} />
 											</button>
 										)}
+										{(restore || archiveOnly) && (
+											<button className={`absolute bottom-2 right-2 grid h-7 w-7 place-items-center rounded-full bg-black/40 text-white opacity-0 transition group-hover:opacity-100`} onClick={(event) => { event.stopPropagation(); (restore ? restorePhoto : archivePhoto)(photo); }} aria-label={restore ? "Restore to library" : "Restore to your media"}>
+												<Icon icon={IconArrowBackUp} size={15} />
+											</button>
+										)}
 										{cardMenuFor === photo.id && (
 											<div ref={albumMenuRef} className="absolute bottom-11 right-2 z-30 w-56 rounded-xl border border-white/15 bg-zinc-900 p-1 text-xs text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
 												{removableAlbumId ? (
@@ -633,31 +678,55 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 							<p className="text-sm font-medium">{viewerPhoto.title}.{viewerPhoto.mime.split("/")[1].toLowerCase()}</p>
 						</div>
 						<div className="flex items-center gap-1">
-							<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 max-md:hidden" onClick={() => favoritePhoto(viewerPhoto)} aria-label={viewerPhoto.favorite ? "Remove from favorites" : "Add to favorites"}>
-								<Icon icon={viewerPhoto.favorite ? IconHeartFilled : IconHeart} />
-							</button>
-							<a className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 max-md:hidden" href={viewerPhoto.large ?? viewerPhoto.image} download target="_blank" rel="noreferrer" aria-label="Download">
-								<Icon icon={IconDownload} />
-							</a>
-							{addable && (
-								<div className="relative">
-									<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 max-md:hidden" onClick={toggleViewerAlbumMenu} aria-label="Add to album" aria-expanded={addToAlbumOpen}>
-										<Icon icon={IconFolderPlus} />
+							{archiveOnly ? (
+								<>
+									<a className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" href={`/api/download?ids=${viewerPhoto.id}`} download aria-label="Download">
+										<Icon icon={IconDownload} />
+									</a>
+									<button ref={infoButtonRef} className={`grid h-10 w-10 place-items-center rounded-full transition hover:bg-white/10 ${infoOpen ? "bg-white/20" : ""}`} onClick={() => setInfoOpen((value) => !value)} aria-label="Info" aria-pressed={infoOpen}>
+										<Icon icon={IconInfoCircle} />
 									</button>
-									{addToAlbumOpen && (
-										<div ref={albumMenuRef} className="absolute right-0 top-full z-20 mt-2 w-60 rounded-xl border border-white/15 bg-zinc-900 py-1 text-xs text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-											{renderAlbumMenuItems((album) => addPhotoToAlbum(album, viewerPhoto.id))}
+									<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" onClick={() => archivePhoto(viewerPhoto)} aria-label="Restore to your media">
+										<Icon icon={IconArrowBackUp} />
+									</button>
+									<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" onClick={() => deletePhoto(viewerPhoto)} aria-label="Delete">
+										<Icon icon={IconTrash} />
+									</button>
+								</>
+							) : (
+								<>
+									<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 max-md:hidden" onClick={() => favoritePhoto(viewerPhoto)} aria-label={viewerPhoto.favorite ? "Remove from favorites" : "Add to favorites"}>
+										<Icon icon={viewerPhoto.favorite ? IconHeartFilled : IconHeart} />
+									</button>
+									<a className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 max-md:hidden" href={viewerPhoto.large ?? viewerPhoto.image} download target="_blank" rel="noreferrer" aria-label="Download">
+										<Icon icon={IconDownload} />
+									</a>
+									{addable && (
+										<div className="relative">
+											<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 max-md:hidden" onClick={toggleViewerAlbumMenu} aria-label="Add to album" aria-expanded={addToAlbumOpen}>
+												<Icon icon={IconFolderPlus} />
+											</button>
+											{addToAlbumOpen && (
+												<div ref={albumMenuRef} className="absolute right-0 top-full z-20 mt-2 w-60 rounded-xl border border-white/15 bg-zinc-900 py-1 text-xs text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+													{renderAlbumMenuItems((album) => addPhotoToAlbum(album, viewerPhoto.id))}
+												</div>
+											)}
 										</div>
 									)}
-								</div>
+									<button ref={infoButtonRef} className={`grid h-10 w-10 place-items-center rounded-full transition hover:bg-white/10 ${infoOpen ? "bg-white/20" : ""}`} onClick={() => setInfoOpen((value) => !value)} aria-label="Info" aria-pressed={infoOpen}>
+										<Icon icon={IconInfoCircle} />
+									</button>
+									{restore && (
+										<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 max-md:hidden" onClick={() => restorePhoto(viewerPhoto)} aria-label="Restore to library">
+											<Icon icon={IconArrowBackUp} />
+										</button>
+									)}
+									<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 max-md:hidden" onClick={() => deletePhoto(viewerPhoto)} aria-label={restore ? "Delete permanently" : "Delete"}>
+										<Icon icon={IconTrash} />
+									</button>
+									<MoreMenu key={viewerPhoto.id} open={moreOpen} setOpen={setMoreOpen} photo={viewerPhoto} onCopyLink={copyViewerLink} onVault={() => vaultPhoto(viewerPhoto)} onArchive={() => archivePhoto(viewerPhoto)} onRenameSubmit={submitRename} onFavorite={() => favoritePhoto(viewerPhoto)} onDelete={() => deletePhoto(viewerPhoto)} onRestore={() => restorePhoto(viewerPhoto)} onAddToAlbum={toggleViewerAlbumMenu} addable={addable} />
+								</>
 							)}
-							<button ref={infoButtonRef} className={`grid h-10 w-10 place-items-center rounded-full transition hover:bg-white/10 ${infoOpen ? "bg-white/20" : ""}`} onClick={() => setInfoOpen((value) => !value)} aria-label="Info" aria-pressed={infoOpen}>
-								<Icon icon={IconInfoCircle} />
-							</button>
-							<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 max-md:hidden" onClick={() => deletePhoto(viewerPhoto)} aria-label="Delete">
-								<Icon icon={IconTrash} />
-							</button>
-							<MoreMenu key={viewerPhoto.id} open={moreOpen} setOpen={setMoreOpen} photo={viewerPhoto} onCopyLink={copyViewerLink} onVault={() => vaultPhoto(viewerPhoto)} onArchive={() => archivePhoto(viewerPhoto)} onRenameSubmit={submitRename} onFavorite={() => favoritePhoto(viewerPhoto)} onDelete={() => deletePhoto(viewerPhoto)} onAddToAlbum={toggleViewerAlbumMenu} addable={addable} />
 						</div>
 					</div>
 					<div className="flex flex-1 items-center overflow-hidden px-2 md:px-12" onClick={(event) => event.stopPropagation()}>

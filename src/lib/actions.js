@@ -153,6 +153,7 @@ export async function moveToArchiveAction(photoId) {
 	const row = ownMedia(user, Number(photoId));
 	if (!row) return { ok: false, error: "Item not found." };
 	setMediaArchived(row.id, !row.archived);
+	if (!row.archived && row.favorite) setMediaFavorite(row.id, 0);
 	logEvent(row.archived ? "media_unarchived" : "media_archived", user.username, row.archived ? `Removed "${row.title}" from the archive` : `Archived "${row.title}"`);
 	await syncArchiveZip(row.user_id);
 	return { ok: true, archived: !row.archived };
@@ -181,6 +182,10 @@ export async function bulkArchiveAction(ids) {
 	if (!rows.length) return { ok: false, error: "No items in your selection." };
 	const archived = rows.every((row) => row.archived) ? 0 : 1;
 	for (const row of rows) setMediaArchived(row.id, archived);
+	if (archived) {
+		const favorited = rows.filter((row) => row.favorite);
+		for (const row of favorited) setMediaFavorite(row.id, 0);
+	}
 	for (const userId of new Set(rows.map((row) => row.user_id))) await syncArchiveZip(userId);
 	logEvent(archived ? "media_archived" : "media_unarchived", user.username, archived ? `Archived ${rows.length} item${rows.length === 1 ? "" : "s"}` : `Removed ${rows.length} item${rows.length === 1 ? "" : "s"} from the archive`);
 	return { ok: true, archived: !!archived, count: rows.length };
@@ -194,6 +199,29 @@ export async function bulkTrashAction(ids) {
 	for (const row of rows) setMediaTrashed(row.id, 1);
 	for (const userId of new Set(rows.filter((row) => row.archived).map((row) => row.user_id))) await syncArchiveZip(userId);
 	logEvent("media_trashed", user.username, `Moved ${rows.length} item${rows.length === 1 ? "" : "s"} to Trash`);
+	return { ok: true, count: rows.length };
+}
+
+export async function restoreMediaAction(photoId) {
+	const user = await getSessionUser();
+	if (!user) return { ok: false, error: "Sign in first." };
+	const row = ownMedia(user, Number(photoId));
+	if (!row) return { ok: false, error: "Item not found." };
+	if (!row.trashed) return { ok: false, error: "Item is not in the trash." };
+	setMediaTrashed(row.id, 0);
+	if (row.archived) await syncArchiveZip(row.user_id);
+	logEvent("media_restored", user.username, `Restored "${row.title}" from Trash`);
+	return { ok: true };
+}
+
+export async function bulkRestoreAction(ids) {
+	const user = await getSessionUser();
+	if (!user) return { ok: false, error: "Sign in first." };
+	const rows = ownRows(user, ids).filter((row) => row.trashed);
+	if (!rows.length) return { ok: false, error: "No items in your selection." };
+	for (const row of rows) setMediaTrashed(row.id, 0);
+	for (const userId of new Set(rows.filter((row) => row.archived).map((row) => row.user_id))) await syncArchiveZip(userId);
+	logEvent("media_restored", user.username, `Restored ${rows.length} item${rows.length === 1 ? "" : "s"} from Trash`);
 	return { ok: true, count: rows.length };
 }
 

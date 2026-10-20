@@ -15,7 +15,7 @@ async function Content({ searchParams }) {
 	return (
 		<section className="mx-auto max-w-360 px-3 pb-32 pt-4 sm:px-5 md:px-8 md:pt-6">
 			<MediaTitle title="Trash" count={photos.length} user={user} />
-			<MediaGrid photos={photos} query={q ?? ""} emptyState={{ iconKey: "trash", title: "No items in Trash", text: `Deleted photos and videos are kept here for ${days} days before being removed forever.` }} />
+			<MediaGrid photos={photos} query={q ?? ""} restore emptyState={{ iconKey: "trash", title: "No items in Trash", text: `Deleted photos and videos are kept here for ${days} days before being removed forever.` }} />
 		</section>
 	);
 }
