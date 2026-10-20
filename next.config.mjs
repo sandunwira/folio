@@ -3,7 +3,7 @@ const nextConfig = {
 	/* config options here */
 	cacheComponents: true,
 	partialPrefetching: true,
-	serverExternalPackages: ["better-sqlite3", "sharp", "heic-convert"],
+	serverExternalPackages: ["better-sqlite3", "sharp", "heic-convert", "archiver"],
 	turbopack: {
 		rules: {
 			"*.css": {

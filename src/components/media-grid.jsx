@@ -103,8 +103,8 @@ function MoreMenu({ open, setOpen, photo, onCopyLink, onVault, onArchive, onRena
 							<a className={`${itemClass} md:hidden`} href={photo.large ?? photo.image} download target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>Download</a>
 							{addable && <button className={`${itemClass} md:hidden`} onClick={() => { setOpen(false); onAddToAlbum(); }}>Add to album</button>}
 							<button className={itemClass} onClick={onCopyLink}>Copy link</button>
-							<button className={itemClass} onClick={onArchive}>Move to archive</button>
-							<button className={itemClass} onClick={onVault}>Move to vault</button>
+							<button className={itemClass} onClick={onArchive}>{photo.archived ? "Restore from archive" : "Move to archive"}</button>
+							<button className={itemClass} onClick={onVault}>{photo.vaulted ? "Restore from vault" : "Move to vault"}</button>
 							<button className={`${itemClass} md:hidden`} onClick={() => { setOpen(false); onDelete(); }}>Move to trash</button>
 						</>
 					)}

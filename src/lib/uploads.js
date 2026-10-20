@@ -168,6 +168,8 @@ function mapMediaRow(row) {
 		mime: row.mime,
 		size: formatBytes(row.size),
 		favorite: !!row.favorite,
+		archived: !!row.archived,
+		vaulted: !!row.vaulted,
 		trashed: !!row.trashed,
 	};
 }

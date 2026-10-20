@@ -5,6 +5,7 @@ import path from "node:path";
 import { redirect } from "next/navigation";
 import { checkLogin, countAdmins, countUsers, createAlbum, createSession, createUser, deleteAlbumRow, deleteMediaRow, destroySession, deleteUser, getAlbum, getMediaRow, getSettings, getSessionUser, getUserByUsername, getUserById, listEvents, logEvent, renameAlbum, renameMedia, addAlbumMedia, removeAlbumMedia, setMediaArchived, setMediaFavorite, setMediaTrashed, setMediaVaulted, setSettings } from "@/lib/auth";
 import { UPLOAD_DIR } from "@/lib/uploads";
+import { syncArchiveZip } from "@/lib/archive";
 
 const usernamePattern = /^[a-z0-9_.-]{2,32}$/;
 
@@ -142,6 +143,7 @@ export async function moveToVaultAction(photoId) {
 	if (!row) return { ok: false, error: "Item not found." };
 	setMediaVaulted(row.id, !row.vaulted);
 	logEvent(row.vaulted ? "media_unvaulted" : "media_vaulted", user.username, row.vaulted ? `Removed "${row.title}" from the vault` : `Moved "${row.title}" to the vault`);
+	if (row.archived) await syncArchiveZip(row.user_id);
 	return { ok: true, vaulted: !row.vaulted };
 }
 
@@ -152,6 +154,7 @@ export async function moveToArchiveAction(photoId) {
 	if (!row) return { ok: false, error: "Item not found." };
 	setMediaArchived(row.id, !row.archived);
 	logEvent(row.archived ? "media_unarchived" : "media_archived", user.username, row.archived ? `Removed "${row.title}" from the archive` : `Archived "${row.title}"`);
+	await syncArchiveZip(row.user_id);
 	return { ok: true, archived: !row.archived };
 }
 
@@ -221,6 +224,7 @@ export async function trashMediaAction(photoId) {
 	const row = ownMedia(user, Number(photoId));
 	if (!row) return { ok: false, error: "Item not found." };
 	if (row.trashed) {
+		if (row.archived) await syncArchiveZip(row.user_id);
 		if (!row.url && row.filename) {
 			await unlink(path.join(UPLOAD_DIR, row.filename)).catch(() => { });
 		}
@@ -228,6 +232,7 @@ export async function trashMediaAction(photoId) {
 		logEvent("media_deleted", user.username, `Permanently deleted "${row.title}"`);
 	} else {
 		setMediaTrashed(row.id, 1);
+		if (row.archived) await syncArchiveZip(row.user_id);
 		logEvent("media_trashed", user.username, `Moved "${row.title}" to Trash`);
 	}
 	return { ok: true, trashed: !row.trashed };
