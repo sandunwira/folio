@@ -4,9 +4,8 @@ import path from "node:path";
 import exifr from "exifr";
 import sharp from "sharp";
 import heicConvert from "heic-convert";
-import { deleteMediaRow, getSettings, insertMediaRow, listAlbumMediaRows, listExpiredTrashRows, listMediaRows, setSettings } from "./db";
+import { deleteMediaRow, getSettings, insertMediaRow, listAlbumMediaRows, listExpiredTrashRows, listMediaRows } from "./db";
 import { estimateLocation } from "./geocode";
-import { SAMPLE_MEDIA } from "./media-data";
 import { formatBytes } from "./format";
 
 export const UPLOAD_DIR = path.join(process.cwd(), "data", "uploads");
@@ -130,27 +129,6 @@ async function purgeExpiredTrash(userId) {
 	}
 }
 
-async function ensureSampleMedia(userId) {
-	const settings = getSettings();
-	if (settings[`samples_seeded_${userId}`] === "1") return;
-	const now = Date.now();
-	for (const sample of SAMPLE_MEDIA) {
-		insertMediaRow({
-			userId,
-			title: sample.title,
-			filename: "",
-			mime: sample.type === "video" ? "video/mp4" : "image/jpeg",
-			size: 0,
-			location: sample.location,
-			url: sample.image,
-			favorite: sample.favorite ?? 0,
-			archived: sample.archived ?? 0,
-			createdAt: now - sample.minutesAgo * 60000,
-		});
-	}
-	setSettings({ [`samples_seeded_${userId}`]: "1" });
-}
-
 function mapMediaRow(row) {
 	const { date, time } = formatDateGroups(row.created_at);
 	return {
@@ -175,7 +153,6 @@ function mapMediaRow(row) {
 }
 
 export async function listUserMedia(userId, view = "media") {
-	await ensureSampleMedia(userId);
 	await purgeExpiredTrash(userId);
 	const filter = VIEW_FILTERS[view] ?? VIEW_FILTERS.media;
 	return listMediaRows(userId).filter(filter).map(mapMediaRow);
