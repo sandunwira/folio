@@ -267,7 +267,7 @@ export default function GalleryChrome({ brand, storage, user }) {
 						</Link>
 					))}
 				</nav>
-				<div className="mt-auto hidden border-t border-line px-2 pb-2 pt-3 md:block md:px-4">
+				<div className="mt-auto hidden px-2 pb-2 pt-4 md:block md:px-4">
 					<div className="rounded-2xl border border-line bg-panel p-4">
 						<p className="text-xs font-medium text-ink">Storage used</p>
 						<div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#ececec]">
