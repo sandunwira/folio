@@ -2,14 +2,17 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { IconAlbum, IconPlus } from "@tabler/icons-react";
 import { getSessionUser, listAlbums } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import NewAlbumForm from "@/components/new-album-form";
 import AlbumMenu from "@/components/album-menu";
+import CoverThumb from "@/components/cover-thumb";
 import MediaTitle, { toPublicUser } from "@/components/media-title";
 
 async function Content({ searchParams }) {
 	const { q } = await searchParams;
 	const query = (q ?? "").toLowerCase();
 	const sessionUser = await getSessionUser();
+	if (!sessionUser) redirect("/login");
 	const user = toPublicUser(sessionUser);
 	const visibleAlbums = listAlbums(sessionUser.id).filter((album) => !query || album.name.toLowerCase().includes(query));
 	return (
@@ -24,7 +27,7 @@ async function Content({ searchParams }) {
 						<div key={album.id} className="group relative">
 							<Link href={`/albums/${album.id}`} className="block">
 								<div className="relative aspect-square overflow-hidden rounded-xl bg-[#ececec]">
-									{album.cover_media_id ? <img src={`/api/media/${album.cover_media_id}/thumb`} alt={album.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" loading="lazy" /> : (
+									{album.cover_media_id ? <CoverThumb src={`/api/media/${album.cover_media_id}/thumb`} alt={album.name} /> : (
 										<div className="grid h-full w-full place-items-center text-muted">
 											<IconAlbum size={28} stroke={1.5} aria-hidden="true" />
 										</div>

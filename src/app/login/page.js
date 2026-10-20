@@ -7,13 +7,7 @@ export const metadata = { title: "Sign in | Folio" };
 
 function Logo() {
 	return (
-		<svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="text-ink">
-			<path d="M12 2a10 10 0 0 1 10 10h-7a3 3 0 0 0-3-3V2z" fill="currentColor" />
-			<path d="M5 8a10 10 0 0 1 10 10H8a3 3 0 0 0-3-3V8z" fill="currentColor" transform="rotate(90 12 12)" />
-			<path d="M2 12a10 10 0 0 0 10 10v-7a3 3 0 0 1-3-3H2z" fill="currentColor" transform="rotate(-90 12 12)" />
-			<path d="M2 12A10 10 0 0 1 12 2v7a3 3 0 0 0-3 3H2z" fill="currentColor" />
-			<circle cx="12" cy="12" r="3.4" fill="#fff" />
-		</svg>
+		<img src="/icon.png" alt="Logo" width={24} height={24} />
 	);
 }
 
@@ -22,14 +16,15 @@ async function Content({ searchParams }) {
 	if (user) redirect("/");
 	const { error } = await searchParams;
 	const isFirstUser = countUsers() === 0;
-	const settings = getSettings();
 
 	return (
 		<div className="grid min-h-screen place-items-center bg-surface p-5">
 			<div className="w-full max-w-sm">
-				<div className="flex flex-col items-center">
-					<Logo />
-					<p className="mt-3 text-xl font-medium text-ink">{settings.app_name}</p>
+				<div className="flex flex-col items-center gap-2">
+					<span className="flex items-center gap-3 mt-3">
+						<Logo />
+						<p className="text-3xl font-semibold tracking-tight text-ink">Folio</p>
+					</span>
 					<p className="text-sm text-muted">Your personal archive</p>
 				</div>
 				<div className="mt-8 rounded-3xl border border-line bg-panel p-7">

@@ -14,6 +14,8 @@ function streamOriginal(row, size) {
 	});
 }
 
+const NATIVE_MIMES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp", "image/svg+xml"]);
+
 export async function GET(_request, { params }) {
 	const { id } = await params;
 	const numericId = Number(id);
@@ -39,11 +41,14 @@ export async function GET(_request, { params }) {
 		await ensureThumbnail(row);
 		thumbStat = await stat(thumbPath).catch(() => null);
 	}
-	if (!thumbStat || thumbStat.size === 0) return streamOriginal(row, originalStat.size);
+	if (thumbStat && thumbStat.size > 0) {
+		const stream = createReadStream(thumbPath);
+		return new Response(Readable.toWeb(stream), {
+			status: 200,
+			headers: { "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=31536000, immutable", "Content-Length": String(thumbStat.size) },
+		});
+	}
 
-	const stream = createReadStream(thumbPath);
-	return new Response(Readable.toWeb(stream), {
-		status: 200,
-		headers: { "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=31536000, immutable", "Content-Length": String(thumbStat.size) },
-	});
+	if (NATIVE_MIMES.has(row.mime)) return streamOriginal(row, originalStat.size);
+	return new Response("Preview unavailable", { status: 404, headers: { "Cache-Control": "no-store" } });
 }

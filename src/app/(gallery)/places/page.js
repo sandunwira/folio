@@ -1,13 +1,16 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { getSessionUser } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { listUserMedia } from "@/lib/uploads";
+import CoverThumb from "@/components/cover-thumb";
 import MediaTitle, { toPublicUser } from "@/components/media-title";
 
 async function Content({ searchParams }) {
 	const { q } = await searchParams;
 	const query = (q ?? "").toLowerCase();
 	const sessionUser = await getSessionUser();
+	if (!sessionUser) redirect("/login");
 	const user = toPublicUser(sessionUser);
 	const photos = await listUserMedia(sessionUser.id, "media");
 	const placeList = photos.reduce((grouped, photo) => {
@@ -27,7 +30,7 @@ async function Content({ searchParams }) {
 					{places.map((place) => (
 						<Link key={place.name} href={`/places/${encodeURIComponent(place.name)}`} className="group">
 							<div className="relative aspect-square overflow-hidden rounded-xl bg-[#ececec]">
-								<img src={place.cover} alt={place.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" loading="lazy" />
+								<CoverThumb src={place.cover} alt={place.name} />
 							</div>
 							<p className="mt-2.5 truncate text-sm font-medium">{place.name}</p>
 							<p className="text-xs text-muted">{place.count} {place.count === 1 ? "item" : "items"}</p>

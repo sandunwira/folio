@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { getSessionUser } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { listUserMedia } from "@/lib/uploads";
 import MediaGrid from "@/components/media-grid";
 import MediaTitle, { toPublicUser } from "@/components/media-title";
@@ -7,6 +8,7 @@ import MediaTitle, { toPublicUser } from "@/components/media-title";
 async function Content({ searchParams }) {
 	const { q } = await searchParams;
 	const sessionUser = await getSessionUser();
+	if (!sessionUser) redirect("/login");
 	const user = toPublicUser(sessionUser);
 	const photos = await listUserMedia(sessionUser.id, "media");
 	return (

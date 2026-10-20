@@ -17,7 +17,6 @@ import {
 	IconHeartFilled,
 	IconInfoCircle,
 	IconLock,
-	IconMapPin,
 	IconLocation,
 	IconMinus,
 	IconPhoto,
@@ -594,7 +593,7 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 							<div className="mx-auto flex flex-col items-center gap-2 rounded-2xl bg-white/5 px-8 py-10 text-center text-white">
 								<Icon icon={IconPhotoOff} size={46} stroke={1} className="text-zinc-400 mb-4" />
 								<p className="text-sm font-medium">No preview available</p>
-								<p className="max-w-xs text-xs leading-5 text-white/60">{viewerPhoto.mime.toUpperCase()} - this browser can't display the original file format.</p>
+								<p className="max-w-xs text-xs leading-5 text-white/60">{viewerPhoto.mime.toUpperCase()} - this browser can&apos;t display the original file format.</p>
 								<a href={viewerPhoto.large ?? viewerPhoto.image} download className="mt-1 rounded-full bg-white/15 px-4 py-2 text-xs font-medium text-white transition hover:bg-white/25" onClick={(event) => event.stopPropagation()}>
 									Download original
 								</a>

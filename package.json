@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "thumbs:backfill": "node scripts/backfill-thumbs.cjs"
   },
   "dependencies": {
     "@tabler/icons-react": "^3.49.0",

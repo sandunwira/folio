@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import exifr from "exifr";
 import sharp from "sharp";
-import { convert as heicConvert } from "heic-convert";
+import heicConvert from "heic-convert";
 import { deleteMediaRow, getSettings, insertMediaRow, listAlbumMediaRows, listExpiredTrashRows, listMediaRows, setSettings } from "./db";
 import { estimateLocation } from "./geocode";
 import { SAMPLE_MEDIA } from "./media-data";
@@ -13,9 +13,8 @@ export const UPLOAD_DIR = path.join(process.cwd(), "data", "uploads");
 export const THUMB_DIR = path.join(process.cwd(), "data", "thumbs");
 
 const THUMB_SIZE = 512;
-const THUMB_MIME = "image/jpeg";
 const thumbJobs = new Map();
-const thumbFailures = new Set();
+const thumbCooldowns = new Map();
 
 export async function writeThumbnail(mediaId, buffer, mime = "") {
 	try {
@@ -28,7 +27,7 @@ export async function writeThumbnail(mediaId, buffer, mime = "") {
 		}
 		await mkdir(THUMB_DIR, { recursive: true });
 		await sharp(input).rotate(angle).resize(THUMB_SIZE, THUMB_SIZE, { fit: "cover" }).jpeg({ quality: 82 }).toFile(path.join(THUMB_DIR, `${mediaId}.jpg`));
-		thumbFailures.delete(mediaId);
+		thumbCooldowns.delete(mediaId);
 		return true;
 	} catch {
 		return false;
@@ -36,7 +35,7 @@ export async function writeThumbnail(mediaId, buffer, mime = "") {
 }
 
 export async function ensureThumbnail(row) {
-	if (row.url || row.mime.startsWith("image/") === false || thumbFailures.has(row.id)) return false;
+	if (row.url || !row.mime.startsWith("image/") || (thumbCooldowns.get(row.id) ?? 0) > Date.now()) return false;
 	const thumbPath = path.join(THUMB_DIR, `${row.id}.jpg`);
 	const existing = await stat(thumbPath).catch(() => null);
 	if (existing && existing.size > 0) return true;
@@ -46,13 +45,12 @@ export async function ensureThumbnail(row) {
 			(async () => {
 				let ok = false;
 				try {
-					const original = path.join(UPLOAD_DIR, row.filename);
-					ok = await writeThumbnail(row.id, await readFile(original), row.mime);
+					ok = await writeThumbnail(row.id, await readFile(path.join(UPLOAD_DIR, row.filename)), row.mime);
 				} catch {
 					ok = false;
 				} finally {
 					thumbJobs.delete(row.id);
-					if (!ok) thumbFailures.add(row.id);
+					if (!ok) thumbCooldowns.set(row.id, Date.now() + 30000);
 				}
 				return ok;
 			})(),
