@@ -36,7 +36,7 @@ async function LayoutContent({ children }) {
 	};
 	return (
 		<div className="min-h-screen bg-surface text-ink">
-			<GalleryChrome brand={settings.app_name ?? "Folio"} storage={storage} user={{ name: sessionUser.name, username: sessionUser.username, isAdmin: !!sessionUser.isAdmin }} />
+			<GalleryChrome brand="Folio" storage={storage} user={{ name: sessionUser.name, username: sessionUser.username, isAdmin: !!sessionUser.isAdmin }} />
 			<main className="md:ml-64">{children}</main>
 		</div>
 	);

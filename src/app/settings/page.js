@@ -72,11 +72,6 @@ async function Content({ searchParams }) {
 							<p className="mt-1 text-xs text-muted">These settings control the whole archive for every account.</p>
 						</div>
 						<form action={updateAdminSettingsAction} className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2">
-							<label className="flex flex-col gap-1.5 sm:col-span-2">
-								<span className="text-xs font-medium text-ink">Site name</span>
-								<input name="appName" type="text" maxLength={40} required defaultValue={settings.app_name} className="h-10 rounded-full border border-line bg-surface px-4 text-sm text-ink outline-none focus:border-ink" />
-								<span className="text-[11px] text-faint">Shown as the brand in the gallery sidebar.</span>
-							</label>
 							<label className="flex flex-col gap-1.5">
 								<span className="text-xs font-medium text-ink">Session lifetime (days)</span>
 								<input name="sessionDays" type="number" min={1} max={365} required defaultValue={settings.session_days} className="h-10 rounded-full border border-line bg-surface px-4 text-sm text-ink outline-none focus:border-ink" />

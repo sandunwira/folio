@@ -123,7 +123,7 @@ function connectDatabase() {
 connectDatabase();
 
 const DEFAULT_SETTINGS = {
-	app_name: "Folio",
+	maintenance: "off",
 	maintenance: "off",
 	session_days: "30",
 	quota_gb: "15",

@@ -131,7 +131,6 @@ export async function deleteUserAction(formData) {
 export async function updateAdminSettingsAction(formData) {
 	const session = await getSessionUser();
 	if (!session?.isAdmin) redirect("/");
-	const appName = String(formData.get("appName") ?? "").trim().slice(0, 40);
 	const maintenance = formData.get("maintenance") === "on";
 	const sessionDays = Number(formData.get("sessionDays"));
 	const currentQuota = Number(getSettings().quota_gb);
@@ -139,11 +138,10 @@ export async function updateAdminSettingsAction(formData) {
 	const quotaGb = quotaInput === null ? currentQuota : Number(quotaInput);
 
 	const failPath = (message) => `/settings?error=${encodeURIComponent(message)}`;
-	if (!appName) redirect(failPath("Please enter an archive name."));
 	if (!Number.isInteger(sessionDays) || sessionDays < 1 || sessionDays > 365) redirect(failPath("Session lifetime must be between 1 and 365 days."));
 	if (!Number.isFinite(quotaGb) || quotaGb < 1) redirect(failPath("Storage quota must be at least 1 GB."));
 
-	setSettings({ app_name: appName, maintenance: maintenance ? "on" : "off", session_days: String(sessionDays), quota_gb: String(quotaGb) });
+	setSettings({ maintenance: maintenance ? "on" : "off", session_days: String(sessionDays), quota_gb: String(quotaGb) });
 	logEvent("settings_updated", session.username, maintenance ? "Site settings updated (maintenance on)" : "Site settings updated");
 	redirect("/settings?saved=1");
 }
