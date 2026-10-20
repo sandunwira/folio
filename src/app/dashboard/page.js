@@ -3,7 +3,8 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { getSessionUser, countUsers, countAdmins, countActiveSessions, recentUsers, getSettings } from "@/lib/auth";
 import { computeUsedGb } from "@/lib/storage";
-import { IconDatabase } from "@tabler/icons-react";
+import { IconChevronRight, IconDatabase } from "@tabler/icons-react";
+import Icon from "@/components/icon";
 
 function StatCard({ label, value, sub, children }) {
 	return (
@@ -73,8 +74,9 @@ async function Content() {
 					<a href="/api/admin/db" download className="inline-flex h-10 items-center gap-2 rounded-full bg-ink px-4 text-sm font-medium text-white transition hover:bg-black">
 						<IconDatabase size={16} stroke={1.8} /> Download database
 					</a>
-					<Link href="/dashboard/import-export" className="inline-flex h-10 items-center rounded-full border border-line bg-surface px-4 text-sm font-medium text-ink transition hover:bg-black/5">
-						Import/Export &rarr;
+					<Link href="/dashboard/import-export" className="inline-flex h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-medium text-ink transition hover:bg-black/5">
+						Import/Export
+						<Icon icon={IconChevronRight} size={14} />
 					</Link>
 				</div>
 			</section>
@@ -99,7 +101,10 @@ async function Content() {
 					{recent.length === 0 && <li className="px-6 py-6 text-center text-sm text-muted">No accounts yet.</li>}
 				</ul>
 				<div className="border-t border-line px-6 py-3">
-					<Link href="/dashboard/users" className="text-sm font-medium text-ink hover:underline">Manage accounts &rarr;</Link>
+					<Link href="/dashboard/users" className="inline-flex items-center gap-1 text-sm font-medium text-ink hover:underline">
+						Manage accounts
+						<Icon icon={IconChevronRight} size={14} />
+					</Link>
 				</div>
 			</section>
 		</div>
