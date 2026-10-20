@@ -124,10 +124,8 @@ connectDatabase();
 
 const DEFAULT_SETTINGS = {
 	maintenance: "off",
-	maintenance: "off",
 	session_days: "30",
 	quota_gb: "15",
-	used_gb: "5.7",
 	trash_days: "60",
 };
 
