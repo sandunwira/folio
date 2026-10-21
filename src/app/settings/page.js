@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { IconChevronLeft, IconPower, IconShieldLock } from "@tabler/icons-react";
 import Link from "next/link";
-import { getSessionUser, getSettings } from "@/lib/auth";
+import { getSessionUser, getSettings, sumMediaBytes, countMediaRows } from "@/lib/auth";
+import { formatBytes } from "@/lib/format";
 import { logoutAction, updateAdminSettingsAction } from "@/lib/actions";
 
 export const metadata = { title: "Settings | Folio" };
@@ -12,6 +13,11 @@ async function Content({ searchParams }) {
 	if (!user) redirect("/login");
 	const { error, saved } = await searchParams;
 	const settings = getSettings();
+	const mediaCount = countMediaRows(user.id);
+	const mediaBytes = sumMediaBytes(user.id);
+	const quotaGb = Number(settings.quota_gb) || 0;
+	const quotaBytes = quotaGb * 1e9;
+	const usagePercent = quotaBytes > 0 ? Math.min(100, (mediaBytes / quotaBytes) * 100) : 0;
 
 	return (
 		<div className="min-h-screen bg-surface text-ink">
@@ -63,6 +69,16 @@ async function Content({ searchParams }) {
 							<dd className="font-medium">{user.isAdmin ? "Admin" : "Member"}</dd>
 						</div>
 					</dl>
+					<div className="border-t border-line px-6 py-4">
+						<div className="flex items-end justify-between text-sm">
+							<p className="text-muted">Storage usage</p>
+							<p className="tabular-nums">{formatBytes(mediaBytes)} <span className="text-xs text-faint">of {quotaGb} GB</span></p>
+						</div>
+						<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#ececec]">
+							<div className="h-full rounded-full bg-ink" style={{ width: `${usagePercent}%` }} />
+						</div>
+						<p className="mt-2 text-xs text-faint">{mediaCount} item{mediaCount === 1 ? "" : "s"} in your archive · {usagePercent.toFixed(1)}% of the total quota used</p>
+					</div>
 				</section>
 
 				{user.isAdmin && (
