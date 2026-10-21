@@ -1,6 +1,7 @@
 import { Poppins } from 'next/font/google';
 
 import "./globals.css";
+import Toasts from "@/components/toasts";
 
 const poppins = Poppins({
 	subsets: ["latin"],
@@ -20,7 +21,10 @@ export default function RootLayout({ children }) {
 			lang="en"
 			className={`h-full antialiased ${poppins.className}`}
 		>
-			<body className="min-h-full flex flex-col">{children}</body>
+			<body className="min-h-full flex flex-col">
+				{children}
+				<Toasts />
+			</body>
 		</html>
 	);
 }

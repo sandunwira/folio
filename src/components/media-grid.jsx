@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { addMediaToAlbumAction, bulkAddToAlbumAction, bulkArchiveAction, bulkFavoriteAction, bulkRestoreAction, bulkTrashAction, createAlbumAction, moveToArchiveAction, moveToVaultAction, removeMediaFromAlbumAction, renameMediaAction, restoreMediaAction, toggleMediaFavoriteAction, trashMediaAction } from "@/lib/actions";
+import toast from "react-hot-toast";
 import { IconPlus } from "@tabler/icons-react";
 import {
 	IconAlbum,
@@ -135,7 +136,6 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 	const [infoOpen, setInfoOpen] = useState(false);
 	const [exifById, setExifById] = useState({});
 	const exifFetchRef = useRef({});
-	const [toast, setToast] = useState(null);
 	const [albumPicker, setAlbumPicker] = useState(null);
 	const [confirmTrashOpen, setConfirmTrashOpen] = useState(false);
 	const [albumChoices, setAlbumChoices] = useState(null);
@@ -206,12 +206,6 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 			document.body.style.overflow = previous;
 		};
 	}, [albumPicker, confirmTrashOpen]);
-
-	useEffect(() => {
-		if (!toast) return;
-		const timer = setTimeout(() => setToast(null), 2500);
-		return () => clearTimeout(timer);
-	}, [toast]);
 
 	useEffect(() => {
 		const photoId = infoOpen ? (viewerPhoto?.id ?? null) : null;
@@ -285,7 +279,8 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 	};
 
 	const flashToast = (result, okText, errorText) => {
-		setToast(result?.error ? { kind: "error", text: result.error ?? errorText ?? "Something went wrong." } : { kind: "ok", text: typeof okText === "function" ? okText(result) : okText });
+		if (result?.error) toast.error(result.error ?? errorText ?? "Something went wrong.");
+		else toast.success(typeof okText === "function" ? okText(result) : okText);
 	};
 
 	const favoritePhoto = async (photo) => {
@@ -389,9 +384,9 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 	const copyViewerLink = async () => {
 		try {
 			await navigator.clipboard.writeText(window.location.href);
-			setToast({ kind: "ok", text: "Link copied to clipboard." });
+			toast.success("Link copied to clipboard.");
 		} catch {
-			setToast({ kind: "error", text: "Couldn't copy the link." });
+			toast.error("Couldn't copy the link.");
 		}
 		setMoreOpen(false);
 	};
@@ -754,12 +749,6 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 							</>
 						)}
 					</div>
-				</div>
-			)}
-
-			{toast && (
-				<div className="fixed bottom-24 left-1/2 z-60 -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-xs font-medium text-white shadow-lg" role="status">
-					{toast.text}
 				</div>
 			)}
 		</>
