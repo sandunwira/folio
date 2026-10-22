@@ -2,9 +2,10 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { IconChevronLeft, IconPower, IconShieldLock } from "@tabler/icons-react";
 import Link from "next/link";
-import { getSessionUser, getSettings, sumMediaBytes, countMediaRows } from "@/lib/auth";
+import { getSessionUser, getSettings, sumMediaBytes, countMediaRows, countActiveAdmins } from "@/lib/auth";
 import { formatBytes } from "@/lib/format";
-import { logoutAction, updateAdminSettingsAction } from "@/lib/actions";
+import { clearPersonalDataAction, deactivateSelfAction, deleteSelfAction, importPersonalDataAction, logoutAction, updateAdminSettingsAction } from "@/lib/actions";
+import DangerZone from "@/components/danger-zone";
 
 export const metadata = { title: "Settings | Folio" };
 
@@ -80,6 +81,15 @@ async function Content({ searchParams }) {
 						<p className="mt-2 text-xs text-faint">{mediaCount} item{mediaCount === 1 ? "" : "s"} in your archive · {usagePercent.toFixed(1)}% of the total quota used</p>
 					</div>
 				</section>
+
+				<DangerZone
+					deactivateSelfAction={deactivateSelfAction}
+					deleteSelfAction={deleteSelfAction}
+					clearPersonalDataAction={clearPersonalDataAction}
+					importPersonalDataAction={importPersonalDataAction}
+					isLastAdmin={user.isAdmin && countActiveAdmins() <= 1}
+					hasData={mediaCount > 0}
+				/>
 
 				{user.isAdmin && (
 					<section className="rounded-3xl border border-line bg-panel">

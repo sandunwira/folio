@@ -1,11 +1,12 @@
 "use server";
 
-import { unlink } from "node:fs/promises";
+import { mkdir, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { checkLogin, countActiveAdmins, countAdmins, countUsers, createAlbum, createSession, createUser, deleteAlbumRow, deleteMediaRow, deleteSessionsByUserId, destroySession, deleteUser, getAlbum, getMediaRow, getSettings, getSessionUser, getUserByUsername, getUserById, listEvents, listMediaRows, logEvent, renameAlbum, renameMedia, addAlbumMedia, removeAlbumMedia, setMediaArchived, setMediaFavorite, setMediaTrashed, setMediaVaulted, setSettings, setUserActive } from "@/lib/auth";
-import { UPLOAD_DIR } from "@/lib/uploads";
+import AdmZip from "adm-zip";
+import { checkLogin, countActiveAdmins, countAdmins, countUsers, createAlbum, createSession, createUser, addAlbumMedia, listAlbums, insertMediaRow, deleteAlbumRow, deleteMediaRow, deleteSessionsByUserId, destroySession, deleteUser, getAlbum, getMediaRow, getSettings, getSessionUser, getUserByUsername, getUserById, listEvents, listMediaRows, logEvent, renameAlbum, renameMedia, removeAlbumMedia, setMediaArchived, setMediaFavorite, setMediaTrashed, setMediaVaulted, setSettings, setUserActive } from "@/lib/auth";
+import { THUMB_DIR, UPLOAD_DIR } from "@/lib/uploads";
 import { syncArchiveZip } from "@/lib/archive";
 import { BACKUP_DIR, EXPORT_DIR, CRON_JOB_TYPES, createSnapshot, deleteFile, executeJobType, exportConfigFile, importConfig } from "@/lib/cron";
 import { getCronJobRow, setActiveCronJob, touchCronJob } from "@/lib/auth";
@@ -112,6 +113,127 @@ export async function resetUserPasswordAction(formData) {
 	revalidatePath("/dashboard/users");
 	logEvent("password_reset", session.username, `Reset the password for "${target.username}"${target.id === session.id ? "" : " — their sessions were signed out"}`);
 	return { ok: true };
+}
+
+export async function deactivateSelfAction() {
+	const session = await getSessionUser();
+	if (!session) redirect("/login");
+	if (session.isAdmin && countActiveAdmins() <= 1) return { ok: false, error: "Cannot deactivate the last active admin." };
+	setUserActive(session.id, 0);
+	logEvent("account_deactivated", session.username, `Deactivated own account (${session.username})`);
+	return { ok: true };
+}
+
+export async function clearPersonalDataAction() {
+	const session = await getSessionUser();
+	if (!session) redirect("/login");
+	const rows = listMediaRows(session.id);
+	for (const row of rows) {
+		if (!row.url && row.filename) {
+			await unlink(path.join(UPLOAD_DIR, row.filename)).catch(() => { });
+		}
+		await unlink(path.join(THUMB_DIR, `${row.id}.jpg`)).catch(() => { });
+		deleteMediaRow(row.id);
+	}
+	for (const album of listAlbums(session.id)) {
+		deleteAlbumRow(album.id);
+	}
+	await syncArchiveZip(session.id);
+	logEvent("data_cleared", session.username, `Cleared all personal data (${rows.length} item${rows.length === 1 ? "" : "s"}, albums, uploaded files)`);
+	revalidatePath("/");
+	return { ok: true, count: rows.length };
+}
+
+export async function importPersonalDataAction(formData) {
+	const session = await getSessionUser();
+	if (!session) redirect("/login");
+	const file = formData.get("data");
+	if (!file || typeof file === "string") return { ok: false, error: "Choose a Folio data export (.zip) to import." };
+	const fileName = String(file.name ?? "").toLowerCase();
+	const isZip = fileName.endsWith(".zip") || file.type === "application/zip" || file.type === "application/x-zip-compressed";
+	if (!isZip) return { ok: false, error: "The import file must be a Folio data export (.zip)." };
+
+	let zip;
+	try {
+		zip = new AdmZip(Buffer.from(await file.arrayBuffer()));
+	} catch {
+		return { ok: false, error: "That file is not a valid ZIP archive." };
+	}
+	const manifestEntry = zip.getEntry("folio-data.json");
+	if (!manifestEntry) return { ok: false, error: "That ZIP has no folio-data.json inside — it is not a Folio data export." };
+	let parsed;
+	try {
+		parsed = JSON.parse(zip.readAsText(manifestEntry));
+	} catch {
+		return { ok: false, error: "folio-data.json inside that ZIP is not valid JSON." };
+	}
+	if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.media)) return { ok: false, error: "That export has no media data to import." };
+
+	await mkdir(UPLOAD_DIR, { recursive: true });
+	const existing = new Set(listMediaRows(session.id).map((row) => row.filename || `url:${row.url}`));
+	const filenameToId = new Map();
+	let imported = 0;
+	for (const item of parsed.media) {
+		const rawFilename = typeof item?.filename === "string" ? item.filename : "";
+		const filename = rawFilename && path.basename(rawFilename) === rawFilename && rawFilename !== "." && rawFilename !== ".." ? rawFilename : "";
+		const url = typeof item?.url === "string" && item.url ? item.url : null;
+		const dedupeKey = filename || (url ? `url:${url}` : "");
+		if (!dedupeKey || existing.has(dedupeKey)) continue;
+		const row = insertMediaRow({
+			userId: session.id,
+			title: String(item.title || "Untitled").slice(0, 200),
+			filename,
+			mime: String(item.mime || "application/octet-stream"),
+			size: Number(item.size) || 0,
+			location: typeof item.location === "string" ? item.location : "",
+			url,
+			favorite: item.favorite ? 1 : 0,
+			archived: item.archived ? 1 : 0,
+			createdAt: Number.isFinite(Number(item.created_at)) ? Number(item.created_at) : null,
+		});
+		setMediaArchived(row.id, !!item.archived);
+		setMediaVaulted(row.id, !!item.vaulted);
+		if (item.trashed) setMediaTrashed(row.id, true);
+		existing.add(dedupeKey);
+		if (filename) filenameToId.set(filename, row.id);
+		if (filename) {
+			const targetPath = path.join(UPLOAD_DIR, filename);
+			const fileStat = await stat(targetPath).catch(() => null);
+			if (!fileStat) {
+				const zipEntry = zip.getEntry(`uploads/${filename}`);
+				if (zipEntry) await writeFile(targetPath, zip.readFile(zipEntry));
+			}
+		}
+		imported++;
+	}
+	let albumCount = 0;
+	for (const album of Array.isArray(parsed.albums) ? parsed.albums : []) {
+		const name = String(album?.name || "").trim().slice(0, 120);
+		if (!name) continue;
+		let albumRow = listAlbums(session.id).find((candidate) => candidate.name.toLowerCase() === name.toLowerCase());
+		if (!albumRow) {
+			albumRow = createAlbum(session.id, name);
+			albumCount++;
+		}
+		for (const itemId of Array.isArray(album.items) ? album.items : []) {
+			const mediaId = filenameToId.get(String(itemId));
+			if (mediaId) addAlbumMedia(albumRow.id, mediaId);
+		}
+	}
+	await syncArchiveZip(session.id);
+	logEvent("data_imported", session.username, `Imported ${imported} media item${imported === 1 ? "" : "s"}${albumCount ? ` into ${albumCount} album${albumCount === 1 ? "" : "s"}` : ""} from "${file.name}"`);
+	revalidatePath("/");
+	return { ok: true, count: imported, albums: albumCount };
+}
+
+export async function deleteSelfAction() {
+	const session = await getSessionUser();
+	if (!session) redirect("/login");
+	if (session.isAdmin && countAdmins() <= 1) return { ok: false, error: "Cannot delete the last admin." };
+	const username = session.username;
+	deleteUser(session.id);
+	logEvent("account_deleted", username, `Deleted own account (${username})`);
+	redirect("/login");
 }
 
 export async function deleteUserAction(formData) {

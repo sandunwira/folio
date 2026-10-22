@@ -21,6 +21,8 @@ const eventLabels = {
 	account_created: "Account created",
 	account_deleted: "Account deleted",
 	password_reset: "Password reset",
+	data_cleared: "Cleared personal data",
+	data_imported: "Imported personal data",
 	settings_updated: "Settings updated",
 	media_uploaded: "Media uploaded",
 	media_upload_skipped: "Upload skipped",
