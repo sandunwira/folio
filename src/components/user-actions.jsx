@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { IconDotsVertical } from "@tabler/icons-react";
 import Icon from "@/components/icon";
 
-export default function UserActions({ account, onDelete, onToggle, onResetPassword }) {
+export default function UserActions({ account, onDelete, onToggle, onResetPassword, onResetVaultPin }) {
 	const [modal, setModal] = useState(null);
 	const [error, setError] = useState(null);
 	const [newPassword, setNewPassword] = useState("");
@@ -83,6 +83,9 @@ export default function UserActions({ account, onDelete, onToggle, onResetPasswo
 						<button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition hover:bg-black/5" onClick={() => openModal("reset")}>
 							Reset password
 						</button>
+						<button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition hover:bg-black/5" onClick={() => openModal("vault")}>
+							Reset vault PIN
+						</button>
 						<button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-[#c5221f] transition hover:bg-black/5" disabled={lastIndexAdmin} title={lastIndexAdmin ? "Cannot delete the last admin" : undefined} onClick={() => openModal("delete")}>
 							Delete account
 						</button>
@@ -138,6 +141,21 @@ export default function UserActions({ account, onDelete, onToggle, onResetPasswo
 									</button>
 									<button type="button" disabled={pending || newPassword.length < 6} className="h-10 rounded-full bg-ink px-5 text-sm font-medium text-white transition hover:bg-black disabled:opacity-60" onClick={confirmReset}>
 										Set new password
+									</button>
+								</div>
+							</>
+						)}
+						{modal === "vault" && (
+							<>
+								<h2 className="text-lg font-medium">Reset vault PIN?</h2>
+								<p className="mt-1 text-xs text-muted">The vault PIN of &ldquo;@{account.username}&rdquo; is cleared, along with any lockout from failed attempts. You cannot choose a new PIN for them — only that user can set up their own vault PIN on the vault page.</p>
+								{error && <p className="mt-3 rounded-lg bg-[#fbeaea] px-3 py-2 text-xs text-[#c5221f]">{error}</p>}
+								<div className="mt-5 flex justify-end gap-3">
+									<button type="button" className="h-10 rounded-full px-5 text-sm font-medium text-ink transition hover:bg-black/5" onClick={close}>
+										Cancel
+									</button>
+									<button type="button" disabled={pending} className="h-10 rounded-full bg-ink px-5 text-sm font-medium text-white transition hover:bg-black disabled:opacity-60" onClick={() => confirmSimple(onResetVaultPin)}>
+										Reset vault PIN
 									</button>
 								</div>
 							</>

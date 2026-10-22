@@ -1,7 +1,10 @@
 import { cookies } from "next/headers";
 import { connection } from "next/server";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { SESSION_COOKIE, SESSION_DAYS, createSessionRow, deleteExpiredSessions, deleteSessionByToken, getSessionByToken, getUserByUsername, verifyPassword } from "./db";
+
+export const VAULT_COOKIE = "folio_vault";
+export const VAULT_COOKIE_DAYS = 0.5;
 
 export {
 	countUsers,
@@ -14,10 +17,15 @@ export {
 	countActiveAdmins,
 	getUserByUsername,
 	getUserById,
+	verifyPassword,
 	setUserActive,
+	setVaultPin,
+	clearVaultPin,
+	setVaultAttempts,
 	deleteSessionsByUserId,
 	setUserPasswordRow,
 	hashPassword,
+	MAX_VAULT_ATTEMPTS,
 	getSettings,
 	setSettings,
 	logEvent,
@@ -83,6 +91,36 @@ export async function getSessionUser() {
 		return null;
 	}
 	return { id: row.id, username: row.username, name: row.display_name, isAdmin: row.is_admin === 1, active: row.active !== 0, createdAt: row.created_at };
+}
+
+export function vaultCookieValue(userId, token) {
+	return createHash("sha256").update(`${userId}:${token}`).digest("hex");
+}
+
+export async function grantVaultAccess(userId) {
+	const store = await cookies();
+	const token = store.get(SESSION_COOKIE)?.value;
+	if (!token) return;
+	store.set(VAULT_COOKIE, vaultCookieValue(userId, token), {
+		httpOnly: true,
+		sameSite: "lax",
+		secure: process.env.NODE_ENV === "production",
+		path: "/",
+		maxAge: Math.round(VAULT_COOKIE_DAYS * 24 * 60 * 60),
+	});
+}
+
+export async function hasVaultAccess(userId) {
+	const store = await cookies();
+	const token = store.get(SESSION_COOKIE)?.value;
+	const value = store.get(VAULT_COOKIE)?.value;
+	if (!token || !value) return false;
+	return value === vaultCookieValue(userId, token);
+}
+
+export async function revokeVaultAccess() {
+	const store = await cookies();
+	store.delete(VAULT_COOKIE);
 }
 
 export async function destroySession() {

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { IconShieldLock } from "@tabler/icons-react";
 import { getSessionUser, listUsers } from "@/lib/auth";
-import { createUserAction, deleteUserAction, resetUserPasswordAction, toggleUserActiveAction } from "@/lib/actions";
+import { createUserAction, deleteUserAction, resetUserPasswordAction, resetVaultPinAction, toggleUserActiveAction } from "@/lib/actions";
 import UserActions from "@/components/user-actions";
 
 function Avatar({ name }) {
@@ -85,6 +85,7 @@ async function Content({ searchParams }) {
 										onDelete={deleteUserAction}
 										onToggle={toggleUserActiveAction}
 										onResetPassword={resetUserPasswordAction}
+										onResetVaultPin={resetVaultPinAction}
 									/>
 								)}
 							</li>

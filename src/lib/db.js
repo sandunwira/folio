@@ -118,6 +118,18 @@ function connectDatabase() {
 	} catch (error) {
 		if (!String(error).includes("duplicate column")) throw error;
 	}
+
+	try {
+		db.exec("ALTER TABLE users ADD COLUMN vault_pin_hash TEXT");
+	} catch (error) {
+		if (!String(error).includes("duplicate column")) throw error;
+	}
+
+	try {
+		db.exec("ALTER TABLE users ADD COLUMN vault_attempts INTEGER NOT NULL DEFAULT 0");
+	} catch (error) {
+		if (!String(error).includes("duplicate column")) throw error;
+	}
 }
 
 connectDatabase();
@@ -131,6 +143,19 @@ const DEFAULT_SETTINGS = {
 
 export const SESSION_COOKIE = "folio_session";
 export const SESSION_DAYS = 30;
+export const MAX_VAULT_ATTEMPTS = 5;
+
+export function setVaultPin(id, pinHash) {
+	db.prepare("UPDATE users SET vault_pin_hash = ?, vault_attempts = 0 WHERE id = ?").run(pinHash, id);
+}
+
+export function clearVaultPin(id) {
+	db.prepare("UPDATE users SET vault_pin_hash = NULL, vault_attempts = 0 WHERE id = ?").run(id);
+}
+
+export function setVaultAttempts(id, attempts) {
+	db.prepare("UPDATE users SET vault_attempts = ? WHERE id = ?").run(Math.min(Math.max(attempts, 0), MAX_VAULT_ATTEMPTS), id);
+}
 
 export function hashPassword(password) {
 	const salt = randomBytes(16).toString("hex");

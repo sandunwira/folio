@@ -5,7 +5,7 @@ import path from "node:path";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import AdmZip from "adm-zip";
-import { checkLogin, countActiveAdmins, countAdmins, countUsers, createAlbum, createSession, createUser, addAlbumMedia, listAlbums, insertMediaRow, deleteAlbumRow, deleteMediaRow, deleteSessionsByUserId, destroySession, deleteUser, getAlbum, getMediaRow, getSettings, getSessionUser, getUserByUsername, getUserById, listEvents, listMediaRows, logEvent, renameAlbum, renameMedia, removeAlbumMedia, setMediaArchived, setMediaFavorite, setMediaTrashed, setMediaVaulted, setSettings, setUserActive } from "@/lib/auth";
+import { MAX_VAULT_ATTEMPTS, addAlbumMedia, checkLogin, clearVaultPin, countActiveAdmins, countAdmins, countUsers, createAlbum, createSession, createUser, deleteAlbumRow, deleteMediaRow, deleteSessionsByUserId, destroySession, deleteUser, getAlbum, getMediaRow, getSettings, getSessionUser, getUserByUsername, getUserById, grantVaultAccess, hashPassword, insertMediaRow, listAlbums, listEvents, listMediaRows, logEvent, renameAlbum, renameMedia, removeAlbumMedia, setMediaArchived, setMediaFavorite, setMediaTrashed, setMediaVaulted, setSettings, setUserActive, setVaultAttempts, setVaultPin, verifyPassword } from "@/lib/auth";
 import { THUMB_DIR, UPLOAD_DIR } from "@/lib/uploads";
 import { syncArchiveZip } from "@/lib/archive";
 import { BACKUP_DIR, EXPORT_DIR, CRON_JOB_TYPES, createSnapshot, deleteFile, executeJobType, exportConfigFile, importConfig } from "@/lib/cron";
@@ -112,6 +112,62 @@ export async function resetUserPasswordAction(formData) {
 	if (target.id !== session.id) deleteSessionsByUserId(target.id);
 	revalidatePath("/dashboard/users");
 	logEvent("password_reset", session.username, `Reset the password for "${target.username}"${target.id === session.id ? "" : " — their sessions were signed out"}`);
+	return { ok: true };
+}
+
+const pinPattern = /^\d{4}$/;
+
+export async function setupVaultPinAction(formData) {
+	const user = await getSessionUser();
+	if (!user) return { ok: false, error: "Sign in first." };
+	const pin = String(formData.get("pin") ?? "");
+	const confirm = String(formData.get("confirm") ?? "");
+	if (!pinPattern.test(pin) || !pinPattern.test(confirm)) return { ok: false, error: "Enter exactly 4 digits." };
+	if (pin !== confirm) return { ok: false, error: "PINs do not match." };
+	setVaultPin(user.id, hashPassword(pin));
+	logEvent("vault_pin_set", user.username, "Configured a vault PIN");
+	await grantVaultAccess(user.id);
+	revalidatePath("/vault");
+	return { ok: true };
+}
+
+export async function unlockVaultAction(formData) {
+	const user = await getSessionUser();
+	if (!user) return { ok: false, error: "Sign in first." };
+	const account = user.id ? getUserById(user.id) : null;
+	if (!account?.vault_pin_hash) return { ok: false, error: "No vault PIN is configured. Set up a PIN first." };
+	if (account.vault_attempts >= MAX_VAULT_ATTEMPTS) {
+		logEvent("vault_locked", user.username, "Vault unlock attempt while locked out");
+		return { ok: false, locked: true, error: "Vault is locked after too many failed attempts." };
+	}
+	const pin = String(formData.get("pin") ?? "");
+	if (pinPattern.test(pin) && verifyPassword(pin, account.vault_pin_hash)) {
+		setVaultAttempts(user.id, 0);
+		logEvent("vault_unlocked", user.username, "Unlocked the vault");
+		await grantVaultAccess(user.id);
+		revalidatePath("/vault");
+		return { ok: true };
+	}
+	const attempts = account.vault_attempts + 1;
+	setVaultAttempts(user.id, attempts);
+	logEvent("vault_unlock_failed", user.username, `Failed vault unlock attempt (${attempts}/${MAX_VAULT_ATTEMPTS})`);
+	if (attempts >= MAX_VAULT_ATTEMPTS) {
+		logEvent("vault_locked", user.username, `Vault locked after ${attempts} failed attempts`);
+		return { ok: false, locked: true, attemptsLeft: 0, error: "Vault is locked after too many failed attempts." };
+	}
+	return { ok: false, attemptsLeft: MAX_VAULT_ATTEMPTS - attempts, error: `Incorrect PIN. ${MAX_VAULT_ATTEMPTS - attempts} attempt${MAX_VAULT_ATTEMPTS - attempts === 1 ? "" : "s"} left.` };
+}
+
+export async function resetVaultPinAction(formData) {
+	const session = await getSessionUser();
+	if (!session?.isAdmin) redirect("/");
+	const id = Number(formData.get("id"));
+	const target = id ? getUserById(id) : null;
+	if (!target) return { ok: false, error: "Account not found." };
+	if (!target.vault_pin_hash && target.vault_attempts >= MAX_VAULT_ATTEMPTS) return { ok: false, error: "No vault PIN is configured for this account." };
+	clearVaultPin(target.id);
+	revalidatePath("/dashboard/users");
+	logEvent("vault_pin_reset", session.username, `Reset the vault PIN for "${target.username}" — they can set up a new PIN`);
 	return { ok: true };
 }
 
