@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { addMediaToAlbumAction, bulkAddToAlbumAction, bulkArchiveAction, bulkFavoriteAction, bulkRestoreAction, bulkTrashAction, createAlbumAction, moveToArchiveAction, moveToVaultAction, removeMediaFromAlbumAction, renameMediaAction, restoreMediaAction, toggleMediaFavoriteAction, trashMediaAction } from "@/lib/actions";
+import { addMediaToAlbumAction, bulkAddToAlbumAction, bulkArchiveAction, bulkFavoriteAction, bulkRestoreAction, bulkTrashAction, bulkVaultAction, createAlbumAction, moveToArchiveAction, moveToVaultAction, removeMediaFromAlbumAction, renameMediaAction, restoreMediaAction, toggleMediaFavoriteAction, trashMediaAction } from "@/lib/actions";
 import toast from "react-hot-toast";
 import { IconPlus } from "@tabler/icons-react";
 import {
@@ -26,7 +26,6 @@ import {
 	IconPhotoOff,
 	IconPlayerPlay,
 	IconSearch,
-	IconShare,
 	IconTrash,
 	IconWand,
 	IconX,
@@ -416,6 +415,14 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 		router.refresh();
 	};
 
+	const vaultSelection = async () => {
+		const ids = [...selection];
+		const result = await bulkVaultAction(ids);
+		flashToast(result, (res) => (res.vaulted ? `Moved ${plural(res.count)} to Vault.` : `Removed ${plural(res.count)} from Vault.`));
+		setSelection(new Set());
+		router.refresh();
+	};
+
 	const trashSelection = () => setConfirmTrashOpen(true);
 
 	const confirmTrash = async () => {
@@ -489,8 +496,8 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 								<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" onClick={archiveSelection} aria-label={photos.some((photo) => selection.has(photo.id) && !photo.archived) ? "Move to archive" : "Restore from archive"}>
 									<Icon icon={IconArchive} />
 								</button>
-								<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" aria-label="Share">
-									<Icon icon={IconShare} />
+								<button className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/15" onClick={vaultSelection} aria-label={photos.some((photo) => selection.has(photo.id) && !photo.vaulted) ? "Move to vault" : "Restore from vault"}>
+									<Icon icon={IconLock} />
 								</button>
 							</>
 						)}

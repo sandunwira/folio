@@ -392,6 +392,18 @@ export async function bulkFavoriteAction(ids) {
 	return { ok: true, favorite: !!favorite, count: rows.length };
 }
 
+export async function bulkVaultAction(ids) {
+	const user = await getSessionUser();
+	if (!user) return { ok: false, error: "Sign in first." };
+	const rows = ownRows(user, ids);
+	if (!rows.length) return { ok: false, error: "No items in your selection." };
+	const vaulted = rows.every((row) => row.vaulted) ? 0 : 1;
+	for (const row of rows) setMediaVaulted(row.id, vaulted);
+	for (const userId of new Set(rows.filter((row) => row.archived).map((row) => row.user_id))) await syncArchiveZip(userId);
+	logEvent(vaulted ? "media_vaulted" : "media_unvaulted", user.username, vaulted ? `Moved ${rows.length} item${rows.length === 1 ? "" : "s"} to the vault` : `Removed ${rows.length} item${rows.length === 1 ? "" : "s"} from the vault`);
+	return { ok: true, vaulted: !!vaulted, count: rows.length };
+}
+
 export async function bulkArchiveAction(ids) {
 	const user = await getSessionUser();
 	if (!user) return { ok: false, error: "Sign in first." };
