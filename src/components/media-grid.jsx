@@ -132,6 +132,7 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 	const searchParams = useSearchParams();
 	const [selection, setSelection] = useState(new Set());
 	const [moreOpen, setMoreOpen] = useState(false);
+	const [cardMenuFor, setCardMenuFor] = useState(null);
 	const [infoOpen, setInfoOpen] = useState(false);
 	const [exifById, setExifById] = useState({});
 	const exifFetchRef = useRef({});
@@ -187,6 +188,22 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 		return () => window.removeEventListener("keydown", onKey);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [viewerIndex, visiblePhotos, moreOpen, albumPicker]);
+
+	useEffect(() => {
+		if (!cardMenuFor) return;
+		const onPointerDown = (event) => {
+			if (!event.target.closest("[data-card-menu]") && !event.target.closest("[data-card-menu-panel]")) setCardMenuFor(null);
+		};
+		const onKeyDown = (event) => {
+			if (event.key === "Escape") setCardMenuFor(null);
+		};
+		document.addEventListener("mousedown", onPointerDown);
+		document.addEventListener("keydown", onKeyDown);
+		return () => {
+			document.removeEventListener("mousedown", onPointerDown);
+			document.removeEventListener("keydown", onKeyDown);
+		};
+	}, [cardMenuFor]);
 
 	useEffect(() => {
 		if (!confirmTrashOpen) return;
@@ -390,6 +407,16 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 		setMoreOpen(false);
 	};
 
+	const copyCardLink = async (photo) => {
+		try {
+			await navigator.clipboard.writeText(`${window.location.origin}${pathname}?photo=${photo.id}`);
+			toast.success("Link copied to clipboard.");
+		} catch {
+			toast.error("Couldn't copy the link.");
+		}
+		setCardMenuFor(null);
+	};
+
 	const submitRename = async (formData) => {
 		const result = await renameMediaAction(formData);
 		flashToast(result, "Renamed successfully.");
@@ -564,10 +591,22 @@ export default function MediaGrid({ photos, query = "", emptyState = {}, addable
 											)}
 											<span className="pointer-events-none absolute inset-0 hidden rounded-lg group-hover:block group-hover:bg-black/10" />
 										</button>
-										{(addable || removableAlbumId) && (
-											<button className={`absolute bottom-2 right-2 grid h-7 w-7 place-items-center rounded-full bg-black/40 text-white opacity-100 transition md:opacity-0 md:group-hover:opacity-100`} onClick={(event) => { event.stopPropagation(); openCardAlbumMenu(photo); }} aria-label="Album options">
-												<Icon icon={IconFolderPlus} size={15} />
-											</button>
+										{!(restore || archiveOnly) && (
+											<div className="absolute bottom-2 right-2" data-card-menu>
+												<button className={`grid h-7 w-7 place-items-center rounded-full bg-black/40 text-white opacity-100 transition md:opacity-0 md:group-hover:opacity-100`} onClick={(event) => { event.stopPropagation(); setCardMenuFor(cardMenuFor === photo.id ? null : photo.id); }} aria-label="Item actions" aria-expanded={cardMenuFor === photo.id}>
+													<Icon icon={IconDotsVertical} size={15} />
+												</button>
+												{cardMenuFor === photo.id && (
+													<div data-card-menu-panel className="absolute bottom-9 right-0 z-20 w-44 rounded-xl border border-line bg-panel py-1.5 shadow-xl" onClick={(event) => event.stopPropagation()}>
+														<button className="flex w-full items-center px-4 py-2.5 text-left text-sm text-ink transition hover:bg-black/5" onClick={() => { setCardMenuFor(null); favoritePhoto(photo); }}>{photo.favorite ? "Remove from favorites" : "Add to favorites"}</button>
+														<button className="flex w-full items-center px-4 py-2.5 text-left text-sm text-ink transition hover:bg-black/5" onClick={() => { setCardMenuFor(null); openCardAlbumMenu(photo); }}>Add to album</button>
+														<button className="flex w-full items-center px-4 py-2.5 text-left text-sm text-ink transition hover:bg-black/5" onClick={() => { setCardMenuFor(null); archivePhoto(photo); }}>{photo.archived ? "Restore from archive" : "Move to archive"}</button>
+														<button className="flex w-full items-center px-4 py-2.5 text-left text-sm text-ink transition hover:bg-black/5" onClick={() => { setCardMenuFor(null); vaultPhoto(photo); }}>{photo.vaulted ? "Restore from vault" : "Move to vault"}</button>
+														<button className="flex w-full items-center px-4 py-2.5 text-left text-sm text-ink transition hover:bg-black/5" onClick={() => copyCardLink(photo)}>Copy link</button>
+														<button className="flex w-full items-center px-4 py-2.5 text-left text-sm text-[#c5221f] transition hover:bg-black/5" onClick={() => { setCardMenuFor(null); deletePhoto(photo); }}>Move to trash</button>
+													</div>
+												)}
+											</div>
 										)}
 										{(restore || archiveOnly) && (
 											<button className={`absolute bottom-2 right-2 grid h-7 w-7 place-items-center rounded-full bg-black/40 text-white opacity-100 transition md:opacity-0 md:group-hover:opacity-100`} onClick={(event) => { event.stopPropagation(); (restore ? restorePhoto : archivePhoto)(photo); }} aria-label={restore ? "Restore to library" : "Restore to your media"}>
