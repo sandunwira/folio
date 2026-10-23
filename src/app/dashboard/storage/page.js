@@ -127,7 +127,7 @@ async function Content({ searchParams }) {
 									</p>
 									<p className="text-xs text-muted">{account.mediaCount} item{account.mediaCount === 1 ? "" : "s"} · {sizeLabel(account.mediaBytes)}</p>
 								</div>
-								<span className="shrink-0 text-xs tabular-nums text-faint">{quotaGb > 0 ? `${((account.mediaBytes / (quotaGb * 1e9)) * 100).toFixed(1)}%` : "—"}</span>
+								<span className="shrink-0 text-xs tabular-nums text-faint">{quotaGb > 0 ? `${((account.mediaBytes / (quotaGb * 1e9)) * 100).toFixed(1)}%` : "-"}</span>
 							</div>
 							<div className="mt-2 ml-12 h-1 overflow-hidden rounded-full bg-[#ececec]">
 								<div className="h-full rounded-full bg-ink" style={{ width: `${Math.min(100, (account.mediaBytes / largestAccount) * 100)}%` }} />

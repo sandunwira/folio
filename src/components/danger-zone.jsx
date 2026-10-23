@@ -109,7 +109,7 @@ export default function DangerZone({ deactivateSelfAction, deleteSelfAction, cle
 					<li className="flex flex-wrap items-center gap-3 px-6 py-4">
 						<div className="min-w-0 flex-1">
 							<p className="text-sm font-medium">Clear all my data</p>
-							<p className="mt-0.5 text-xs text-muted">Deletes every item in your archive — media files on disk and their metadata — plus your albums. The account itself stays.</p>
+							<p className="mt-0.5 text-xs text-muted">Deletes every item in your archive, media files on disk and their metadata, plus your albums. The account itself stays.</p>
 						</div>
 						<button type="button" disabled={!hasData} className="inline-flex h-9 items-center gap-2 rounded-full border border-line bg-panel px-4 text-xs font-medium text-[#c5221f] transition hover:bg-black/5 disabled:cursor-not-allowed disabled:text-faint" onClick={() => open("clear")}>
 							<Icon icon={IconTrash} size={14} /> Clear data
@@ -133,7 +133,7 @@ export default function DangerZone({ deactivateSelfAction, deleteSelfAction, cle
 						{modal === "clear" && (
 							<>
 								<h2 className="text-lg font-medium">Clear all your data?</h2>
-								<p className="mt-1 text-xs text-muted">Every item in your archive is permanently deleted — uploaded files, their metadata, and your albums. Your account and its settings stay. This cannot be undone.</p>
+								<p className="mt-1 text-xs text-muted">Every item in your archive is permanently deleted, uploaded files, their metadata, and your albums. Your account and its settings stay. This cannot be undone.</p>
 								{error && <p className="mt-3 rounded-lg bg-[#fbeaea] px-3 py-2 text-xs text-[#c5221f]">{error}</p>}
 								<div className="mt-5 flex justify-end gap-3">
 									<button type="button" className="h-10 rounded-full px-5 text-sm font-medium text-ink transition hover:bg-black/5" onClick={close}>
@@ -149,7 +149,7 @@ export default function DangerZone({ deactivateSelfAction, deleteSelfAction, cle
 							<>
 								<h2 className="text-lg font-medium">Data file too large</h2>
 								<p className="mt-1 text-xs text-muted">
-									Your data file is {(oversizeFile.size / (1024 * 1024)).toFixed(1)} MB, which is over the {(IMPORT_SIZE_LIMIT / (1024 * 1024)).toFixed(0)} MB import limit. To move these files, upload them yourself with the upload button on the Media page — then export a fresh copy if you need one, since uploads made that way are included in the next export.
+									Your data file is {(oversizeFile.size / (1024 * 1024)).toFixed(1)} MB, which is over the {(IMPORT_SIZE_LIMIT / (1024 * 1024)).toFixed(0)} MB import limit. To move these files, upload them yourself with the upload button on the Media page, then export a fresh copy if you need one, since uploads made that way are included in the next export.
 								</p>
 								<div className="mt-5 flex justify-end gap-3">
 									<button type="button" className="h-10 rounded-full px-5 text-sm font-medium text-ink transition hover:bg-black/5" onClick={close}>
@@ -164,7 +164,7 @@ export default function DangerZone({ deactivateSelfAction, deleteSelfAction, cle
 						{modal === "transfer" && (
 							<>
 								<h2 className="text-lg font-medium">Export / import my data</h2>
-								<p className="mt-1 text-xs text-muted">Download a ZIP of your account&rsquo;s data — media metadata, albums, and every uploaded file. Upload a previously downloaded export to fully restore items into this or another Folio account.</p>
+								<p className="mt-1 text-xs text-muted">Download a ZIP of your account&rsquo;s data, media metadata, albums, and every uploaded file. Upload a previously downloaded export to fully restore items into this or another Folio account.</p>
 								<div className="mt-4 flex flex-wrap items-center gap-2">
 									<a href="/api/my/export" download className="inline-flex h-10 items-center gap-2 rounded-full bg-ink px-5 text-sm font-medium text-white transition hover:bg-black">
 										<Icon icon={IconDownload} size={16} /> Download my data

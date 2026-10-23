@@ -111,7 +111,7 @@ export async function resetUserPasswordAction(formData) {
 	setUserPasswordRow(target.id, hashPassword(newPassword));
 	if (target.id !== session.id) deleteSessionsByUserId(target.id);
 	revalidatePath("/dashboard/users");
-	logEvent("password_reset", session.username, `Reset the password for "${target.username}"${target.id === session.id ? "" : " — their sessions were signed out"}`);
+	logEvent("password_reset", session.username, `Reset the password for "${target.username}"${target.id === session.id ? "" : ", their sessions were signed out"}`);
 	return { ok: true };
 }
 
@@ -167,7 +167,7 @@ export async function resetVaultPinAction(formData) {
 	if (!target.vault_pin_hash && target.vault_attempts >= MAX_VAULT_ATTEMPTS) return { ok: false, error: "No vault PIN is configured for this account." };
 	clearVaultPin(target.id);
 	revalidatePath("/dashboard/users");
-	logEvent("vault_pin_reset", session.username, `Reset the vault PIN for "${target.username}" — they can set up a new PIN`);
+	logEvent("vault_pin_reset", session.username, `Reset the vault PIN for "${target.username}", they can set up a new PIN`);
 	return { ok: true };
 }
 
@@ -216,7 +216,7 @@ export async function importPersonalDataAction(formData) {
 		return { ok: false, error: "That file is not a valid ZIP archive." };
 	}
 	const manifestEntry = zip.getEntry("folio-data.json");
-	if (!manifestEntry) return { ok: false, error: "That ZIP has no folio-data.json inside — it is not a Folio data export." };
+	if (!manifestEntry) return { ok: false, error: "That ZIP has no folio-data.json inside, it is not a Folio data export." };
 	let parsed;
 	try {
 		parsed = JSON.parse(zip.readAsText(manifestEntry));
@@ -563,7 +563,7 @@ function formatSize(bytes) {
 }
 
 function describeJobResult(jobType, result) {
-	return `${CRON_JOB_TYPES[jobType]} — ${result?.filename ?? "done"}${result?.size != null ? ` (${formatSize(result.size)})` : ""}`;
+	return `${CRON_JOB_TYPES[jobType]} - ${result?.filename ?? "done"}${result?.size != null ? ` (${formatSize(result.size)})` : ""}`;
 }
 
 export async function createSnapshotAction() {
@@ -625,7 +625,7 @@ export async function runCronAction(id) {
 	if (!job) return { ok: false, error: "Job not found." };
 	const result = await executeJobType(job.job_type);
 	touchCronJob(job.id, Date.now());
-	logEvent("cronjob_ran", user.username, `Manual run of "${job.name}" — ${describeJobResult(job.job_type, result)}`);
+	logEvent("cronjob_ran", user.username, `Manual run of "${job.name}" - ${describeJobResult(job.job_type, result)}`);
 	revalidatePath("/dashboard/cronjobs");
 	return { ok: true };
 }

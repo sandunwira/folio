@@ -132,7 +132,7 @@ export default function UserActions({ account, onDelete, onToggle, onResetPasswo
 						{modal === "reset" && (
 							<>
 								<h2 className="text-lg font-medium">Reset password</h2>
-								<p className="mt-1 text-xs text-muted">Set a new password for &ldquo;@{account.username}&rdquo;{account.isSelf ? "" : " — their active sessions will be signed out."}</p>
+								<p className="mt-1 text-xs text-muted">Set a new password for &ldquo;@{account.username}&rdquo;{account.isSelf ? "" : ", their active sessions will be signed out."}</p>
 								<input type="password" autoFocus required minLength={6} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="New password (at least 6 characters)" className="mt-4 h-10 w-full rounded-full border border-line bg-surface px-4 text-sm text-ink outline-none placeholder:text-faint focus:border-ink" />
 								{error && <p className="mt-3 rounded-lg bg-[#fbeaea] px-3 py-2 text-xs text-[#c5221f]">{error}</p>}
 								<div className="mt-5 flex justify-end gap-3">
@@ -148,7 +148,7 @@ export default function UserActions({ account, onDelete, onToggle, onResetPasswo
 						{modal === "vault" && (
 							<>
 								<h2 className="text-lg font-medium">Reset vault PIN?</h2>
-								<p className="mt-1 text-xs text-muted">The vault PIN of &ldquo;@{account.username}&rdquo; is cleared, along with any lockout from failed attempts. You cannot choose a new PIN for them — only that user can set up their own vault PIN on the vault page.</p>
+								<p className="mt-1 text-xs text-muted">The vault PIN of &ldquo;@{account.username}&rdquo; is cleared, along with any lockout from failed attempts. You cannot choose a new PIN for them, only that user can set up their own vault PIN on the vault page.</p>
 								{error && <p className="mt-3 rounded-lg bg-[#fbeaea] px-3 py-2 text-xs text-[#c5221f]">{error}</p>}
 								<div className="mt-5 flex justify-end gap-3">
 									<button type="button" className="h-10 rounded-full px-5 text-sm font-medium text-ink transition hover:bg-black/5" onClick={close}>
